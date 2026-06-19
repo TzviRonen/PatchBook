@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if page.title %}{{ page.title }} — {% endif %}{{ site.title }}</title>
+  <link rel="stylesheet" href="{{ '/assets/main.css' | relative_url }}">
+  {% seo %}
+  {% feed_meta %}
+</head>
+<body>
+<nav>
+  <a class="nav-brand" href="{{ '/' | relative_url }}">
+    <div class="brand-icon">P</div>
+    PatchBook
+  </a>
+  <div class="nav-links">
+    <a href="{{ '/' | relative_url }}"{% if page.url == '/' %} class="active"{% endif %}>Posts</a>
+    <a href="{{ '/about' | relative_url }}"{% if page.url == '/about/' %} class="active"{% endif %}>About</a>
+  </div>
+  <div class="nav-right">
+    <a href="{{ '/feed.xml' | relative_url }}" class="btn btn-muted" title="RSS Feed">RSS</a>
+  </div>
+</nav>
+{% block content %}{{ content }}{% endblock %}
+<footer>
+  <div class="footer-inner">
+    <span>PatchBook — Windows kernel CVE analysis</span>
+    <span>Powered by <a href="https://github.com/tzvironen/kernel-cve-pipeline">kernel-cve-pipeline</a></span>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,49 @@
+---
+layout: default
+---
+<div class="page">
+  <div class="page-header">
+    <h1>CVE Analysis Posts</h1>
+    <p>Deep-dives into Windows kernel patches — binary diffs, decompilation, and exploitation primitives.</p>
+  </div>
+
+  {% if site.posts.size == 0 %}
+  <div class="empty-state">
+    <div class="empty-icon">📭</div>
+    <p>No posts yet. Run the pipeline and publish.</p>
+  </div>
+  {% else %}
+  <div class="post-list">
+    {% for post in site.posts %}
+    <a class="post-card" href="{{ post.url | relative_url }}">
+      <div class="post-card-meta">
+        <div class="flex-gap">
+          <span class="badge blue mono">{{ post.cve_id | default: post.title }}</span>
+          {% if post.cvss %}
+            {% assign cvss = post.cvss | times: 1.0 %}
+            {% if cvss >= 9.0 %}
+              <span class="badge red">CVSS {{ post.cvss }}</span>
+            {% elsif cvss >= 7.0 %}
+              <span class="badge orange">CVSS {{ post.cvss }}</span>
+            {% elsif cvss >= 4.0 %}
+              <span class="badge yellow">CVSS {{ post.cvss }}</span>
+            {% else %}
+              <span class="badge muted">CVSS {{ post.cvss }}</span>
+            {% endif %}
+          {% endif %}
+        </div>
+        <span class="post-date">{{ post.date | date: "%b %-d, %Y" }}</span>
+      </div>
+      <h2 class="post-card-title">{{ post.title }}</h2>
+      {% if post.subtitle %}
+        <p class="post-card-subtitle">{{ post.subtitle }}</p>
+      {% endif %}
+      {% if post.excerpt %}
+        <p class="post-card-excerpt">{{ post.excerpt | strip_html | truncate: 240 }}</p>
+      {% endif %}
+      <span class="post-card-link">Read full post →</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>

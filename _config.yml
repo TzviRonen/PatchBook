@@ -1,0 +1,24 @@
+title: PatchBook
+description: Windows kernel CVE analysis — binary diffs and patch breakdowns by the kernel-cve-pipeline
+url: "https://tzvironen.github.io"
+baseurl: "/patchbook"
+author: tzvironen
+
+theme: null
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+  syntax_highlighter_opts:
+    css_class: "highlight"
+
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+
+permalink: /posts/:slug/
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README.md

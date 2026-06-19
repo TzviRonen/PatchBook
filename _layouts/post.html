@@ -1,0 +1,33 @@
+---
+layout: default
+---
+<div class="page page-post">
+  <div class="post-header">
+    <div class="post-header-meta">
+      <div class="flex-gap">
+        {% if page.cve_id %}
+          <span class="badge blue mono">{{ page.cve_id }}</span>
+        {% endif %}
+        {% if page.cvss %}
+          {% assign cvss = page.cvss | times: 1.0 %}
+          {% if cvss >= 9.0 %}
+            <span class="badge red">CVSS {{ page.cvss }}</span>
+          {% elsif cvss >= 7.0 %}
+            <span class="badge orange">CVSS {{ page.cvss }}</span>
+          {% elsif cvss >= 4.0 %}
+            <span class="badge yellow">CVSS {{ page.cvss }}</span>
+          {% else %}
+            <span class="badge muted">CVSS {{ page.cvss }}</span>
+          {% endif %}
+        {% endif %}
+        <span class="muted small">{{ page.date | date: "%B %-d, %Y" }}</span>
+      </div>
+      <a href="{{ '/' | relative_url }}" class="btn btn-muted back-link">← All posts</a>
+    </div>
+    <h1 class="post-title">{{ page.title }}</h1>
+  </div>
+
+  <article class="prose">
+    {{ content }}
+  </article>
+</div>
