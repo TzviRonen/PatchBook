@@ -1,0 +1,193 @@
+"""Minimal Flask server for PatchBook — serves _posts/*.md as a static blog."""
+import re
+from pathlib import Path
+
+import markdown as md
+from flask import Flask, abort, render_template_string
+
+POSTS_DIR = Path(__file__).parent / "_posts"
+CSS = (Path(__file__).parent / "assets" / "main.css").read_text()
+
+app = Flask(__name__)
+
+# ── frontmatter parsing ────────────────────────────────────────────────────────
+
+_FM_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
+_MD_STRIP_RE = re.compile(r"(\*\*|__|\*|_|`)")  # strip inline markdown from plain-text fields
+
+
+def _strip_md(text: str) -> str:
+    """Remove common inline markdown syntax for use in plain-text contexts."""
+    return _MD_STRIP_RE.sub("", text)
+
+
+def _parse(path: Path) -> dict:
+    text = path.read_text(encoding="utf-8")
+    fm: dict = {}
+    m = _FM_RE.match(text)
+    if m:
+        for line in m.group(1).splitlines():
+            if ":" in line:
+                k, _, v = line.partition(":")
+                fm[k.strip()] = v.strip().strip('"')
+        body = text[m.end():]
+    else:
+        body = text
+    fm["_body"] = body
+    fm["_slug"] = path.stem
+    return fm
+
+
+def _all_posts() -> list[dict]:
+    posts = [_parse(p) for p in sorted(POSTS_DIR.glob("*.md"), reverse=True)]
+    return posts
+
+
+def _cvss_class(cvss: str) -> str:
+    try:
+        v = float(cvss)
+        if v >= 9: return "red"
+        if v >= 7: return "orange"
+        if v >= 4: return "yellow"
+    except (ValueError, TypeError):
+        pass
+    return "muted"
+
+
+def _render_body(raw: str) -> str:
+    """Render markdown body, stripping the leading H1 (shown in post header)."""
+    # Remove the first H1 heading to avoid duplicate title
+    body = re.sub(r"^#[^#][^\n]*\n", "", raw.lstrip(), count=1)
+    return md.markdown(body, extensions=["fenced_code", "tables", "toc", "nl2br"])
+
+
+# ── base template ──────────────────────────────────────────────────────────────
+
+BASE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Posts{% endblock %} — PatchBook</title>
+  <style>{{ css }}</style>
+</head>
+<body>
+<nav>
+  <a class="nav-brand" href="/">
+    <div class="brand-icon">P</div>
+    PatchBook
+  </a>
+  <div class="nav-links">
+    <a href="/"{% if active in ('home', 'post') %} class="active"{% endif %}>Posts</a>
+    <a href="/about"{% if active == 'about' %} class="active"{% endif %}>About</a>
+  </div>
+</nav>
+{% block body %}{% endblock %}
+<footer>
+  <div class="footer-inner">
+    <span>PatchBook — Windows kernel CVE analysis</span>
+    <span>Powered by <a href="https://github.com/tzvironen/kernel-cve-pipeline">kernel-cve-pipeline</a></span>
+  </div>
+</footer>
+</body>
+</html>"""
+
+HOME_TPL = BASE.replace("{% block title %}Posts{% endblock %}", "Posts").replace(
+    "{% block body %}{% endblock %}", """
+<div class="page">
+  <div class="page-header">
+    <h1>CVE Analysis Posts</h1>
+    <p>Deep-dives into Windows kernel patches — binary diffs, decompilation, and exploitation primitives.</p>
+  </div>
+  {% if posts %}
+  <div class="post-list">
+    {% for p in posts %}
+    <a class="post-card" href="/posts/{{ p._slug }}">
+      <div class="post-card-meta">
+        <div class="flex-gap">
+          {% if p.cve_id %}<span class="badge blue mono">{{ p.cve_id }}</span>{% endif %}
+          {% if p.cvss %}<span class="badge {{ cvss_class(p.cvss) }}">CVSS {{ p.cvss }}</span>{% endif %}
+        </div>
+        <span class="post-date">{{ p.date }}</span>
+      </div>
+      <h2 class="post-card-title">{{ p.title }}</h2>
+      {% if p.excerpt %}<p class="post-card-excerpt">{{ strip_md(p.excerpt) }}</p>{% endif %}
+      <span class="post-card-link">Read full post →</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="empty-icon">📭</div><p>No posts yet.</p></div>
+  {% endif %}
+</div>
+""")
+
+POST_TPL = BASE.replace("{% block title %}Posts{% endblock %}", "{{ post.title }}").replace(
+    "{% block body %}{% endblock %}", """
+<div class="page page-post">
+  <div class="post-header">
+    <div class="post-header-meta">
+      <div class="flex-gap">
+        {% if post.cve_id %}<span class="badge blue mono">{{ post.cve_id }}</span>{% endif %}
+        {% if post.cvss %}<span class="badge {{ cvss_class(post.cvss) }}">CVSS {{ post.cvss }}</span>{% endif %}
+        <span class="muted small">{{ post.date }}</span>
+      </div>
+      <a href="/" class="btn btn-muted back-link">← All posts</a>
+    </div>
+    <h1 class="post-title">{{ post.title }}</h1>
+  </div>
+  <article class="prose">{{ body|safe }}</article>
+</div>
+""")
+
+ABOUT_TPL = BASE.replace("{% block title %}Posts{% endblock %}", "About").replace(
+    "{% block body %}{% endblock %}", """
+<div class="page">
+  <div class="page-header"><h1>About PatchBook</h1></div>
+  <article class="prose">
+    <p>PatchBook publishes deep technical analyses of Windows kernel security patches.
+    Each post is generated by
+    <a href="https://github.com/tzvironen/kernel-cve-pipeline">kernel-cve-pipeline</a> —
+    an automated system that downloads patched and unpatched Windows binaries,
+    diffs them with Ghidriff, identifies the changed function via a Claude agent,
+    and writes a structured post covering the root cause, patch mechanics, and exploitation primitive.</p>
+    <h2>Audience</h2>
+    <p>Posts assume familiarity with C, Windows kernel internals, and common vulnerability
+    classes (TOCTOU, UAF, pool overflows).</p>
+  </article>
+</div>
+""")
+
+# ── routes ─────────────────────────────────────────────────────────────────────
+
+@app.route("/")
+def home():
+    posts = _all_posts()
+    return render_template_string(HOME_TPL, posts=posts, css=CSS,
+                                  active="home", cvss_class=_cvss_class,
+                                  strip_md=_strip_md)
+
+
+@app.route("/posts/<slug>")
+def post(slug: str):
+    path = POSTS_DIR / f"{slug}.md"
+    if not path.exists():
+        abort(404)
+    p = _parse(path)
+    body = _render_body(p["_body"])
+    return render_template_string(POST_TPL, post=p, body=body, css=CSS,
+                                  active="post", cvss_class=_cvss_class,
+                                  strip_md=_strip_md)
+
+
+@app.route("/about")
+def about():
+    return render_template_string(ABOUT_TPL, css=CSS, active="about",
+                                  cvss_class=_cvss_class, strip_md=_strip_md)
+
+
+if __name__ == "__main__":
+    import sys
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 4000
+    print(f"[*] PatchBook  →  http://localhost:{port}/")
+    app.run(host="0.0.0.0", port=port, debug=False)
