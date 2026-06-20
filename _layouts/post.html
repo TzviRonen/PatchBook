@@ -2,6 +2,16 @@
 layout: default
 ---
 <div class="page page-post">
+  {%- comment -%}
+    Community validation marks live in this post's `validations:` frontmatter
+    (see scripts/apply_validation.py). The tally sits in the header beside the
+    "All posts" button; the submission actions form a toolbar under the title.
+    All submissions are client-side: prefilled GitHub issue / web-editor URLs.
+  {%- endcomment -%}
+  {% assign valid_marks  = page.validations | where: "verdict", "valid" %}
+  {% assign slop_marks   = page.validations | where: "verdict", "ai-slop" %}
+  {% assign fix_marks    = page.validations | where: "verdict", "needs-fixing" %}
+
   <div class="post-header">
     <div class="post-header-meta">
       <div class="flex-gap">
@@ -24,10 +34,97 @@ layout: default
       </div>
       <a href="{{ '/' | relative_url }}" class="btn btn-muted back-link">← All posts</a>
     </div>
+
     <h1 class="post-title">{{ page.title }}</h1>
+
+    <div class="community community-bar"
+         data-post-path="{{ page.path }}"
+         data-cve="{{ page.cve_id }}"
+         data-repo="{{ site.github_repo }}"
+         data-branch="{{ site.github_branch }}">
+      <div class="community-tally" title="Reader fact-check of this AI-generated post">
+        <span class="community-tally-label">Community check</span>
+        <span class="badge green"  title="Marked valid">{{ valid_marks | size }} valid</span>
+        <span class="badge red"    title="Flagged as AI slop">{{ slop_marks | size }} AI-slop</span>
+        <span class="badge yellow" title="Flagged as needing fixes">{{ fix_marks | size }} needs fixing</span>
+      </div>
+
+      <div class="community-actions">
+      <details class="community-box">
+        <summary class="btn btn-muted">Validate</summary>
+        <form class="community-form" onsubmit="return PatchBook.submitValidation(this)">
+          <p class="muted small">Posts here are AI-generated and may be wrong. Mark this analysis and add your name so others can weigh it. Opens a prefilled GitHub issue.</p>
+          <div class="community-verdicts">
+            <label><input type="radio" name="verdict" value="valid" required> Valid</label>
+            <label><input type="radio" name="verdict" value="ai-slop"> AI-slop</label>
+            <label><input type="radio" name="verdict" value="needs-fixing"> Needs fixing</label>
+          </div>
+          <input type="text" name="name" placeholder="Your name" maxlength="80" required>
+          <input type="text" name="contact" placeholder="Contact — email, x.com or linkedin URL" maxlength="200" required>
+          <textarea name="note" rows="2" maxlength="500" placeholder="Optional note"></textarea>
+          <button type="submit" class="btn btn-blue">Open validation issue →</button>
+        </form>
+      </details>
+
+      <details class="community-box">
+        <summary class="btn btn-muted">Suggest change</summary>
+        <div class="community-form">
+          <p class="muted small">Found an error? Edit the source directly on GitHub (opens a pull request automatically), or describe the change and we'll open an issue.</p>
+          <a class="btn btn-blue community-edit" href="#" target="_blank" rel="noopener" onclick="return PatchBook.editOnGitHub(this)">✎ Edit on GitHub (opens a PR)</a>
+          <form onsubmit="return PatchBook.submitSuggestion(this)">
+            <textarea name="suggestion" rows="4" maxlength="2000" placeholder="Describe the suggested change…" required></textarea>
+            <button type="submit" class="btn btn-muted">Open suggestion issue →</button>
+          </form>
+        </div>
+      </details>
+
+      {% if page.validations and page.validations.size > 0 %}
+      <details class="community-box community-list">
+        <summary class="btn btn-muted">{{ page.validations | size }} reader mark{% if page.validations.size != 1 %}s{% endif %}</summary>
+        <ul>
+          {% for v in page.validations %}
+          <li>
+            {% case v.verdict %}
+              {% when 'valid' %}<span class="badge green">valid</span>
+              {% when 'ai-slop' %}<span class="badge red">AI-slop</span>
+              {% else %}<span class="badge yellow">needs fixing</span>
+            {% endcase %}
+            {% assign c = v.contact %}
+            {%- comment -%} only treat http(s) as a link — blocks javascript:/data: XSS {%- endcomment -%}
+            {% assign is_url = false %}
+            {% if c contains '://' %}
+              {% assign scheme = c | split: '://' | first | downcase %}
+              {% if scheme == 'http' or scheme == 'https' %}{% assign is_url = true %}{% endif %}
+            {% endif %}
+            {% if is_url %}
+              <a href="{{ c }}" target="_blank" rel="noopener nofollow">{{ v.name | default: c }}</a>
+            {% elsif c contains '@' %}
+              <a href="mailto:{{ c }}">{{ v.name | default: c }}</a>
+            {% else %}
+              <span>{{ v.name | default: 'anonymous' }}</span>
+            {% endif %}
+            <span class="muted small">· {{ v.date }}</span>
+            {% if v.note %}<div class="community-note">{{ v.note }}</div>{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </details>
+      {% endif %}
+      </div><!-- /.community-actions -->
+    </div><!-- /.community-bar -->
   </div>
 
+  {%- comment -%}
+    Drop the leading <h1> kramdown renders from the post body's `# Title`
+    heading — the styled title already appears in .post-header above.
+  {%- endcomment -%}
+  {%- assign _body = content -%}
+  {%- if content | strip | slice: 0, 3 == '<h1' -%}
+    {%- assign _body = content | split: '</h1>' | slice: 1, 9999 | join: '</h1>' -%}
+  {%- endif -%}
   <article class="prose">
-    {{ content }}
+    {{ _body }}
   </article>
 </div>
+
+<script src="{{ '/assets/patchbook.js' | relative_url }}"></script>

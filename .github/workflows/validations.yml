@@ -1,0 +1,71 @@
+name: Apply community validation
+
+# When a reader submits a "Validate this post" form on the site, it opens a
+# prefilled issue labelled `validation`. This workflow parses that issue, records
+# the mark in the post's frontmatter, commits it (which retriggers the Pages
+# build), then closes the issue. Uses only the built-in GITHUB_TOKEN — no
+# secrets, free for public repos.
+
+on:
+  issues:
+    types: [opened, labeled]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: validations
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: contains(github.event.issue.labels.*.name, 'validation')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Apply validation to post frontmatter
+        id: apply
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          set +e
+          OUT=$(python scripts/apply_validation.py 2>err.txt)
+          CODE=$?
+          ERR=$(cat err.txt)
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          {
+            echo "summary<<EOF"
+            echo "${OUT:-$ERR}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Commit, comment and close
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number }}
+          CODE: ${{ steps.apply.outputs.code }}
+          SUMMARY: ${{ steps.apply.outputs.summary }}
+        run: |
+          if [ "$CODE" = "0" ]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add _posts
+            if git diff --cached --quiet; then
+              gh issue comment "$ISSUE" --body "No change applied (the mark may already be recorded)."
+            else
+              git commit -m "validation: record mark from issue #$ISSUE"
+              git push
+              gh issue comment "$ISSUE" --body "✅ Recorded — it'll appear on the post once the site rebuilds. Thanks!"
+            fi
+            gh issue close "$ISSUE"
+          else
+            gh issue comment "$ISSUE" --body "⚠️ Could not record this validation automatically: $SUMMARY"
+            gh issue edit "$ISSUE" --add-label "invalid"
+          fi

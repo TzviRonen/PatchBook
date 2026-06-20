@@ -4,6 +4,12 @@ url: "https://tzvironen.github.io"
 baseurl: "/patchbook"
 author: tzvironen
 
+# Source repo backing the site — used to build community validation /
+# suggestion links (prefilled GitHub issue & web-editor URLs). See
+# _layouts/post.html and assets/patchbook.js.
+github_repo: tzvironen/patchbook
+github_branch: main
+
 theme: null
 markdown: kramdown
 kramdown:
@@ -22,3 +28,6 @@ exclude:
   - Gemfile
   - Gemfile.lock
   - README.md
+  - scripts
+  - setup.sh
+  - serve.sh
