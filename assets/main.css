@@ -161,6 +161,109 @@ footer {
 }
 .btn:hover { filter: brightness(0.93); }
 .btn-muted { background: var(--bg3); color: var(--muted); border-color: var(--border); }
+.btn-blue  { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+/* ── community validation & suggestions ── */
+.community {
+  margin-top: 2.5rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--border);
+}
+.community-tally {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+.community-tally-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-right: 0.25rem;
+}
+.community-list { margin-bottom: 1rem; }
+.community-list summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.community-list ul { list-style: none; padding: 0.5rem 0 0; margin: 0; }
+.community-list li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 0.9rem;
+}
+.community-list a { color: var(--blue); text-decoration: none; font-weight: 600; }
+.community-list a:hover { text-decoration: underline; }
+.community-note {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding-left: 0.2rem;
+}
+
+.community-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.community-box { flex: 1; min-width: 260px; }
+.community-box > summary {
+  list-style: none;
+  display: inline-flex;
+}
+.community-box > summary::-webkit-details-marker { display: none; }
+.community-form {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+.community-form input[type="text"],
+.community-form textarea {
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.65rem;
+}
+.community-form textarea { resize: vertical; }
+.community-form input:focus,
+.community-form textarea:focus {
+  outline: none;
+  border-color: var(--blue);
+  background: var(--bg);
+}
+.community-verdicts {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+}
+.community-verdicts label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+.community-form .btn { align-self: flex-start; }
+.community-edit { align-self: flex-start; }
 
 /* ── layout ── */
 .page {
