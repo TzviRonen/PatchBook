@@ -49,13 +49,10 @@ window.PatchBook = (function () {
     return el && el.value ? el.value.trim() : "";
   }
 
-  function submitValidation(form) {
+  function submitValidation(form, verdict) {
     var el = form;
-    var verdict = field(form, "verdict");
-    var name = field(form, "name");
-    var contact = field(form, "contact");
     var note = field(form, "note");
-    if (!verdict || !name || !contact) return false;
+    if (!verdict) return false;
 
     // Structured yaml block parsed by scripts/apply_validation.py.
     var body =
@@ -67,12 +64,6 @@ window.PatchBook = (function () {
       "\n" +
       "verdict: " +
       verdict +
-      "\n" +
-      "name: " +
-      name +
-      "\n" +
-      "contact: " +
-      contact +
       "\n" +
       (note ? "note: " + note.replace(/\r?\n/g, " ") + "\n" : "") +
       "```\n";
@@ -110,6 +101,28 @@ window.PatchBook = (function () {
       postPath(el);
     return true; // let the anchor navigate (target=_blank)
   }
+
+  // Only one of Validate/AI-slop/Suggest change stays open at a time. We just
+  // collapse the others (remove `open`) rather than reset their forms, so
+  // whatever the reader typed there is still there if they reopen it.
+  function initAccordion() {
+    var groups = document.querySelectorAll(".community-actions");
+    groups.forEach(function (group) {
+      var boxes = group.querySelectorAll(
+        ":scope > details.community-box:not(.community-list)"
+      );
+      boxes.forEach(function (box) {
+        box.addEventListener("toggle", function () {
+          if (!box.open) return;
+          boxes.forEach(function (other) {
+            if (other !== box) other.open = false;
+          });
+        });
+      });
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", initAccordion);
 
   return {
     submitValidation: submitValidation,

@@ -254,7 +254,6 @@ footer {
   padding: 1rem;
   box-shadow: var(--shadow-sm);
 }
-.community-form input[type="text"],
 .community-form textarea {
   width: 100%;
   font-family: var(--font-ui);
@@ -264,25 +263,12 @@ footer {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.5rem 0.65rem;
+  resize: vertical;
 }
-.community-form textarea { resize: vertical; }
-.community-form input:focus,
 .community-form textarea:focus {
   outline: none;
   border-color: var(--blue);
   background: var(--bg);
-}
-.community-verdicts {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  font-size: 0.9rem;
-}
-.community-verdicts label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  cursor: pointer;
 }
 .community-form .btn { align-self: flex-start; }
 .community-edit { align-self: flex-start; }

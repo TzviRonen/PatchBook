@@ -9,8 +9,6 @@ by assets/patchbook.js, e.g.:
     type: validation
     post: _posts/2026-06-08-cve-....md
     verdict: valid
-    name: Jane Doe
-    contact: https://x.com/jane
     note: optional one-liner
     ```
 
@@ -36,7 +34,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 POSTS_DIR = (SCRIPT_DIR.parent / "_posts").resolve()
 
 VERDICTS = {"valid", "ai-slop", "needs-fixing"}
-MAX = {"name": 80, "contact": 200, "note": 500}
+MAX = {"note": 500}
 _YAML_BLOCK_RE = re.compile(r"```ya?ml\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
 _FIELD_RE = re.compile(r"^([A-Za-z_]+)\s*:\s*(.*)$")
 _POST_NAME_RE = re.compile(r"^_posts/[A-Za-z0-9._-]+\.md$")
@@ -83,42 +81,15 @@ def yaml_str(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def check_contact(contact: str) -> None:
-    """Reject contacts that would become a dangerous link on the rendered page.
-
-    The post template links the contact when it looks like a URL (`scheme://…`).
-    Only http/https are allowed there — otherwise a value like
-    `javascript://%0aalert(1)` or `data:…` becomes stored XSS. Scheme-less
-    handles (e.g. `x.com/jane`, `@jane`) and plain emails are fine: they render
-    as text or mailto.
-    """
-    if "://" in contact:
-        scheme = contact.split("://", 1)[0].lower()
-        if scheme not in ("http", "https"):
-            reject(f"contact URL scheme {scheme!r} not allowed (use http/https, email, or a handle)")
-    # block any other URL-ish scheme that a renderer might honour as a link
-    elif re.match(r"(?i)\s*(javascript|data|vbscript|file)\s*:", contact):
-        reject("contact must be an http(s) URL, an email, or a plain handle")
-
-
 def build_entry(fields: dict) -> list[str]:
     verdict = fields.get("verdict", "").strip().lower()
     if verdict not in VERDICTS:
         reject(f"invalid verdict {verdict!r}; must be one of {sorted(VERDICTS)}")
 
-    name = sanitize(fields.get("name", ""), MAX["name"])
-    contact = sanitize(fields.get("contact", ""), MAX["contact"])
     note = sanitize(fields.get("note", ""), MAX["note"])
-    if not name:
-        reject("missing name")
-    if not contact:
-        reject("missing contact")
-    check_contact(contact)
 
     lines = [
         f"  - verdict: {verdict}",
-        f"    name: {yaml_str(name)}",
-        f"    contact: {yaml_str(contact)}",
         f"    date: {date.today().isoformat()}",
     ]
     if note:

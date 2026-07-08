@@ -52,17 +52,19 @@ layout: default
       <div class="community-actions">
       <details class="community-box">
         <summary class="btn btn-muted">Validate</summary>
-        <form class="community-form" onsubmit="return PatchBook.submitValidation(this)">
-          <p class="muted small">Posts here are AI-generated and may be wrong. Mark this analysis and add your name so others can weigh it. Opens a prefilled GitHub issue.</p>
-          <div class="community-verdicts">
-            <label><input type="radio" name="verdict" value="valid" required> Valid</label>
-            <label><input type="radio" name="verdict" value="ai-slop"> AI-slop</label>
-            <label><input type="radio" name="verdict" value="needs-fixing"> Needs fixing</label>
-          </div>
-          <input type="text" name="name" placeholder="Your name" maxlength="80" required>
-          <input type="text" name="contact" placeholder="Contact — email, x.com or linkedin URL" maxlength="200" required>
+        <form class="community-form" onsubmit="return PatchBook.submitValidation(this, 'valid')">
+          <p class="muted small">Posts here are AI-generated and may be wrong. Mark this analysis as correct. Opens a prefilled GitHub issue.</p>
           <textarea name="note" rows="2" maxlength="500" placeholder="Optional note"></textarea>
           <button type="submit" class="btn btn-blue">Open validation issue →</button>
+        </form>
+      </details>
+
+      <details class="community-box">
+        <summary class="btn btn-muted">AI-slop</summary>
+        <form class="community-form" onsubmit="return PatchBook.submitValidation(this, 'ai-slop')">
+          <p class="muted small">Posts here are AI-generated and may be wrong. Flag this analysis as AI slop. Opens a prefilled GitHub issue.</p>
+          <textarea name="note" rows="2" maxlength="500" placeholder="Optional note"></textarea>
+          <button type="submit" class="btn btn-muted">Open validation issue →</button>
         </form>
       </details>
 
@@ -90,18 +92,24 @@ layout: default
               {% else %}<span class="badge yellow">needs fixing</span>
             {% endcase %}
             {% assign c = v.contact %}
-            {%- comment -%} only treat http(s) as a link — blocks javascript:/data: XSS {%- endcomment -%}
-            {% assign is_url = false %}
-            {% if c contains '://' %}
-              {% assign scheme = c | split: '://' | first | downcase %}
-              {% if scheme == 'http' or scheme == 'https' %}{% assign is_url = true %}{% endif %}
-            {% endif %}
-            {% if is_url %}
-              <a href="{{ c }}" target="_blank" rel="noopener nofollow">{{ v.name | default: c }}</a>
-            {% elsif c contains '@' %}
-              <a href="mailto:{{ c }}">{{ v.name | default: c }}</a>
-            {% else %}
-              <span>{{ v.name | default: 'anonymous' }}</span>
+            {%- comment -%}
+              name/contact are only present on marks recorded before those fields
+              were removed from the form — kept here so old entries still render.
+            {%- endcomment -%}
+            {% if c %}
+              {%- comment -%} only treat http(s) as a link — blocks javascript:/data: XSS {%- endcomment -%}
+              {% assign is_url = false %}
+              {% if c contains '://' %}
+                {% assign scheme = c | split: '://' | first | downcase %}
+                {% if scheme == 'http' or scheme == 'https' %}{% assign is_url = true %}{% endif %}
+              {% endif %}
+              {% if is_url %}
+                <a href="{{ c }}" target="_blank" rel="noopener nofollow">{{ v.name | default: c }}</a>
+              {% elsif c contains '@' %}
+                <a href="mailto:{{ c }}">{{ v.name | default: c }}</a>
+              {% else %}
+                <span>{{ v.name | default: 'anonymous' }}</span>
+              {% endif %}
             {% endif %}
             <span class="muted small">· {{ v.date }}</span>
             {% if v.note %}<div class="community-note">{{ v.note }}</div>{% endif %}
