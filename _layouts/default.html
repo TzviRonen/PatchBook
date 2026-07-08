@@ -18,9 +18,6 @@
     <a href="{{ '/' | relative_url }}"{% if page.url == '/' %} class="active"{% endif %}>Posts</a>
     <a href="{{ '/about' | relative_url }}"{% if page.url == '/about/' %} class="active"{% endif %}>About</a>
   </div>
-  <div class="nav-right">
-    <a href="{{ '/feed.xml' | relative_url }}" class="btn btn-muted" title="RSS Feed">RSS</a>
-  </div>
 </nav>
 {{ content }}
 <footer>

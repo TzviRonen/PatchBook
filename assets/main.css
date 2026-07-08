@@ -102,7 +102,6 @@ nav {
 }
 .nav-links a:hover { color: var(--text); }
 .nav-links a.active { color: var(--text); border-bottom-color: var(--blue); }
-.nav-right { margin-left: auto; display: flex; align-items: center; gap: 0.75rem; }
 
 /* ── footer ── */
 footer {
