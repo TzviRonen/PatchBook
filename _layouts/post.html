@@ -127,7 +127,8 @@ layout: default
     heading — the styled title already appears in .post-header above.
   {%- endcomment -%}
   {%- assign _body = content -%}
-  {%- if content | strip | slice: 0, 3 == '<h1' -%}
+  {%- assign _head = content | strip | slice: 0, 3 -%}
+  {%- if _head == '<h1' -%}
     {%- assign _body = content | split: '</h1>' | slice: 1, 9999 | join: '</h1>' -%}
   {%- endif -%}
   <article class="prose">
