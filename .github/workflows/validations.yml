@@ -13,6 +13,7 @@ on:
 permissions:
   contents: write
   issues: write
+  actions: write
 
 concurrency:
   group: validations
@@ -33,6 +34,7 @@ jobs:
         id: apply
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
         run: |
           set +e
           OUT=$(python scripts/apply_validation.py 2>err.txt)
@@ -62,6 +64,10 @@ jobs:
             else
               git commit -m "validation: record mark from issue #$ISSUE"
               git push
+              # The bot's push uses the default GITHUB_TOKEN, so GitHub suppresses
+              # the `on: push` trigger for pages.yml (recursion prevention). Fire
+              # the Pages rebuild explicitly via workflow_dispatch. See ARCHITECTURE.md.
+              gh workflow run pages.yml || echo "warning: could not dispatch pages.yml"
               gh issue comment "$ISSUE" --body "✅ Recorded — it'll appear on the post once the site rebuilds. Thanks!"
             fi
             gh issue close "$ISSUE"

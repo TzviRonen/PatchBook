@@ -38,6 +38,8 @@ MAX = {"note": 500}
 _YAML_BLOCK_RE = re.compile(r"```ya?ml\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
 _FIELD_RE = re.compile(r"^([A-Za-z_]+)\s*:\s*(.*)$")
 _POST_NAME_RE = re.compile(r"^_posts/[A-Za-z0-9._-]+\.md$")
+# GitHub usernames: alphanumeric plus single hyphens, 1–39 chars, no leading hyphen.
+_USERNAME_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
 
 
 def reject(msg: str):
@@ -81,7 +83,15 @@ def yaml_str(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def build_entry(fields: dict) -> list[str]:
+def read_author() -> str:
+    """The issue author's GitHub username, from the trusted event payload (not the
+    spoofable issue body). Returns '' if absent or not a valid username — in which
+    case the mark is recorded anonymously (keeps local/manual runs working)."""
+    author = sanitize(os.environ.get("ISSUE_AUTHOR", ""), 39)
+    return author if _USERNAME_RE.match(author) else ""
+
+
+def build_entry(fields: dict, author: str) -> list[str]:
     verdict = fields.get("verdict", "").strip().lower()
     if verdict not in VERDICTS:
         reject(f"invalid verdict {verdict!r}; must be one of {sorted(VERDICTS)}")
@@ -92,6 +102,8 @@ def build_entry(fields: dict) -> list[str]:
         f"  - verdict: {verdict}",
         f"    date: {date.today().isoformat()}",
     ]
+    if author:
+        lines.append(f"    name: {yaml_str(author)}")
     if note:
         lines.append(f"    note: {yaml_str(note)}")
     return lines
@@ -110,7 +122,37 @@ def resolve_post(post: str) -> Path:
     return target
 
 
-def apply(target: Path, entry: list[str]) -> None:
+def _already_recorded(fm: list[str], key_idx: int, verdict: str, author: str) -> bool:
+    """True if the existing `validations:` block already holds an entry with this
+    exact (name, verdict) pair. An anonymous mark (author == '') is never treated
+    as a duplicate. Uses the same simple line-based parse as the rest of the file:
+    the block runs from the key until the first non-indented (top-level) line."""
+    if not author:
+        return False
+    cur_verdict = None
+    cur_name = ""
+    for line in fm[key_idx + 1:]:
+        if line and not line[0].isspace():
+            break  # next top-level frontmatter key ends the block
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            # a new list entry begins — reset accumulators
+            cur_verdict, cur_name = None, ""
+            stripped = stripped[2:].strip()
+        m = _FIELD_RE.match(stripped)
+        if not m:
+            continue
+        k, v = m.group(1).strip().lower(), m.group(2).strip()
+        if k == "verdict":
+            cur_verdict = v.lower()
+        elif k == "name":
+            cur_name = v.strip('"').replace('\\"', '"').replace("\\\\", "\\")
+        if cur_verdict == verdict and cur_name == author:
+            return True
+    return False
+
+
+def apply(target: Path, entry: list[str], verdict: str, author: str) -> None:
     text = target.read_text(encoding="utf-8")
     if not text.startswith("---"):
         reject(f"{target.name} has no YAML frontmatter")
@@ -133,6 +175,10 @@ def apply(target: Path, entry: list[str]) -> None:
         fm.append("validations:")
         fm.extend(entry)
     else:
+        if _already_recorded(fm, key_idx, verdict, author):
+            print(f"OK: already recorded {verdict} by {author} on "
+                  f"{target.relative_to(POSTS_DIR.parent)}")
+            sys.exit(0)
         fm[key_idx + 1:key_idx + 1] = entry
 
     target.write_text("\n".join(fm + rest), encoding="utf-8")
@@ -143,9 +189,12 @@ def main() -> None:
     if fields.get("type", "validation").lower() != "validation":
         reject(f"unexpected type {fields.get('type')!r}")
     target = resolve_post(fields.get("post", ""))
-    entry = build_entry(fields)
-    apply(target, entry)
-    print(f"OK: recorded {fields['verdict']} on {target.relative_to(POSTS_DIR.parent)}")
+    author = read_author()
+    entry = build_entry(fields, author)
+    verdict = fields["verdict"].strip().lower()
+    apply(target, entry, verdict, author)
+    who = f" by {author}" if author else ""
+    print(f"OK: recorded {verdict}{who} on {target.relative_to(POSTS_DIR.parent)}")
 
 
 if __name__ == "__main__":

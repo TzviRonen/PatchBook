@@ -134,6 +134,45 @@ layout: default
   <article class="prose">
     {{ _body }}
   </article>
+
+  {%- comment -%}
+    Community review: per-verdict contributor lists at the bottom of the post.
+    Rendered only when marks exist. One group per verdict, driven by a single
+    spec loop (verdict|label|badge-class|symbol) so the markup lives in one
+    place. Each group is shown only if it has marks. Names are GitHub usernames
+    validated by scripts/apply_validation.py against the username regex, so
+    linking to https://github.com/<name> is safe; nameless marks read as
+    "anonymous".
+  {%- endcomment -%}
+  {% if page.validations and page.validations.size > 0 %}
+  {% assign review_specs = "valid|Validated by|green|✓,ai-slop|Flagged AI-slop by|red|✗,needs-fixing|Needs fixing per|yellow|⚠" | split: "," %}
+  <section class="community-review">
+    <h2>Community review</h2>
+    {% for spec in review_specs %}
+      {% assign parts = spec | split: "|" %}
+      {% assign marks = page.validations | where: "verdict", parts[0] %}
+      {% if marks.size > 0 %}
+      <div class="review-group">
+        <h3 class="review-group-label">{{ parts[1] }}</h3>
+        <ul>
+          {% for v in marks %}
+          <li>
+            <span class="badge {{ parts[2] }}" aria-hidden="true">{{ parts[3] }}</span>
+            {% if v.name %}
+              <a href="https://github.com/{{ v.name }}" target="_blank" rel="noopener nofollow">{{ v.name }}</a>
+            {% else %}
+              <span>anonymous</span>
+            {% endif %}
+            <span class="muted small">· {{ v.date }}</span>
+            {% if v.note %}<div class="community-note">{{ v.note }}</div>{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </section>
+  {% endif %}
 </div>
 
 <script src="{{ '/assets/patchbook.js' | relative_url }}"></script>

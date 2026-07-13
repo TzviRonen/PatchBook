@@ -272,6 +272,39 @@ footer {
 .community-form .btn { align-self: flex-start; }
 .community-edit { align-self: flex-start; }
 
+/* per-verdict contributor lists at the bottom of a post */
+.community-review {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.community-review h2 { margin: 0 0 1rem; font-size: 1.25rem; }
+.review-group { margin-bottom: 1.1rem; }
+.review-group-label {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.community-review ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.community-review li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 0.9rem;
+}
+.community-review a { color: var(--blue); text-decoration: none; font-weight: 600; }
+.community-review a:hover { text-decoration: underline; }
+
 /* ── layout ── */
 .page {
   max-width: 860px;
