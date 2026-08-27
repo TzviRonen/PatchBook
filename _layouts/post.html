@@ -16,18 +16,18 @@ layout: default
     <div class="post-header-meta">
       <div class="flex-gap">
         {% if page.cve_id %}
-          <span class="badge blue mono">{{ page.cve_id }}</span>
+          <span class="badge blue mono">{{ page.cve_id | escape }}</span>
         {% endif %}
         {% if page.cvss %}
           {% assign cvss = page.cvss | times: 1.0 %}
           {% if cvss >= 9.0 %}
-            <span class="badge red">CVSS {{ page.cvss }}</span>
+            <span class="badge red">CVSS {{ page.cvss | escape }}</span>
           {% elsif cvss >= 7.0 %}
-            <span class="badge orange">CVSS {{ page.cvss }}</span>
+            <span class="badge orange">CVSS {{ page.cvss | escape }}</span>
           {% elsif cvss >= 4.0 %}
-            <span class="badge yellow">CVSS {{ page.cvss }}</span>
+            <span class="badge yellow">CVSS {{ page.cvss | escape }}</span>
           {% else %}
-            <span class="badge muted">CVSS {{ page.cvss }}</span>
+            <span class="badge muted">CVSS {{ page.cvss | escape }}</span>
           {% endif %}
         {% endif %}
         <span class="muted small">{{ page.date | date: "%B %-d, %Y" }}</span>
@@ -35,13 +35,13 @@ layout: default
       <a href="{{ '/' | relative_url }}" class="btn btn-muted back-link">← All posts</a>
     </div>
 
-    <h1 class="post-title">{{ page.title }}</h1>
+    <h1 class="post-title">{{ page.title | escape }}</h1>
 
     <div class="community community-bar"
-         data-post-path="{{ page.path }}"
-         data-cve="{{ page.cve_id }}"
-         data-repo="{{ site.github_repo }}"
-         data-branch="{{ site.github_branch }}">
+         data-post-path="{{ page.path | escape }}"
+         data-cve="{{ page.cve_id | escape }}"
+         data-repo="{{ site.github_repo | escape }}"
+         data-branch="{{ site.github_branch | escape }}">
       <div class="community-tally" title="Reader fact-check of this AI-generated post">
         <span class="community-tally-label">Community check</span>
         <span class="badge green"  title="Marked valid">{{ valid_marks | size }} valid</span>
@@ -80,44 +80,6 @@ layout: default
         </div>
       </details>
 
-      {% if page.validations and page.validations.size > 0 %}
-      <details class="community-box community-list">
-        <summary class="btn btn-muted">{{ page.validations | size }} reader mark{% if page.validations.size != 1 %}s{% endif %}</summary>
-        <ul>
-          {% for v in page.validations %}
-          <li>
-            {% case v.verdict %}
-              {% when 'valid' %}<span class="badge green">valid</span>
-              {% when 'ai-slop' %}<span class="badge red">AI-slop</span>
-              {% else %}<span class="badge yellow">needs fixing</span>
-            {% endcase %}
-            {% assign c = v.contact %}
-            {%- comment -%}
-              name/contact are only present on marks recorded before those fields
-              were removed from the form — kept here so old entries still render.
-            {%- endcomment -%}
-            {% if c %}
-              {%- comment -%} only treat http(s) as a link — blocks javascript:/data: XSS {%- endcomment -%}
-              {% assign is_url = false %}
-              {% if c contains '://' %}
-                {% assign scheme = c | split: '://' | first | downcase %}
-                {% if scheme == 'http' or scheme == 'https' %}{% assign is_url = true %}{% endif %}
-              {% endif %}
-              {% if is_url %}
-                <a href="{{ c }}" target="_blank" rel="noopener nofollow">{{ v.name | default: c }}</a>
-              {% elsif c contains '@' %}
-                <a href="mailto:{{ c }}">{{ v.name | default: c }}</a>
-              {% else %}
-                <span>{{ v.name | default: 'anonymous' }}</span>
-              {% endif %}
-            {% endif %}
-            <span class="muted small">· {{ v.date }}</span>
-            {% if v.note %}<div class="community-note">{{ v.note }}</div>{% endif %}
-          </li>
-          {% endfor %}
-        </ul>
-      </details>
-      {% endif %}
       </div><!-- /.community-actions -->
     </div><!-- /.community-bar -->
   </div>
@@ -159,12 +121,12 @@ layout: default
           <li>
             <span class="badge {{ parts[2] }}" aria-hidden="true">{{ parts[3] }}</span>
             {% if v.name %}
-              <a href="https://github.com/{{ v.name }}" target="_blank" rel="noopener nofollow">{{ v.name }}</a>
+              <a href="https://github.com/{{ v.name | uri_escape }}" target="_blank" rel="noopener nofollow">{{ v.name | escape }}</a>
             {% else %}
               <span>anonymous</span>
             {% endif %}
-            <span class="muted small">· {{ v.date }}</span>
-            {% if v.note %}<div class="community-note">{{ v.note }}</div>{% endif %}
+            <span class="muted small">· {{ v.date | escape }}</span>
+            {% if v.note %}<div class="community-note">{{ v.note | escape }}</div>{% endif %}
           </li>
           {% endfor %}
         </ul>

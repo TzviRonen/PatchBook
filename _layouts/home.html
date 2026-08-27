@@ -18,7 +18,7 @@ layout: default
     <a class="post-card" href="{{ post.url | relative_url }}">
       <div class="post-card-meta">
         <div class="flex-gap">
-          <span class="badge blue mono">{{ post.cve_id | default: post.title }}</span>
+          <span class="badge blue mono">{{ post.cve_id | default: post.title | escape }}</span>
           {% if post.cvss %}
             {% assign cvss = post.cvss | times: 1.0 %}
             {% if cvss >= 9.0 %}
@@ -34,12 +34,12 @@ layout: default
         </div>
         <span class="post-date">{{ post.date | date: "%b %-d, %Y" }}</span>
       </div>
-      <h2 class="post-card-title">{{ post.title }}</h2>
+      <h2 class="post-card-title">{{ post.title | escape }}</h2>
       {% if post.subtitle %}
-        <p class="post-card-subtitle">{{ post.subtitle }}</p>
+        <p class="post-card-subtitle">{{ post.subtitle | escape }}</p>
       {% endif %}
       {% if post.excerpt %}
-        <p class="post-card-excerpt">{{ post.excerpt | strip_html | truncate: 240 }}</p>
+        <p class="post-card-excerpt">{{ post.excerpt | strip_html | truncate: 240 | escape }}</p>
       {% endif %}
       <span class="post-card-link">Read full post →</span>
     </a>

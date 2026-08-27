@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% if page.title %}{{ page.title }} — {% endif %}{{ site.title }}</title>
+  <title>{% if page.title %}{{ page.title | escape }} — {% endif %}{{ site.title | escape }}</title>
   <link rel="stylesheet" href="{{ '/assets/main.css' | relative_url }}">
   <link rel="icon" type="image/svg+xml" href="{{ '/assets/favicon.svg' | relative_url }}">
   {% seo %}

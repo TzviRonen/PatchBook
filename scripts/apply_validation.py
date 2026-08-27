@@ -72,6 +72,13 @@ def parse_block(body: str) -> dict:
 
 
 def sanitize(value: str, limit: int) -> str:
+    # Defense in depth against stored XSS: notes are rendered into the post page,
+    # so strip anything HTML-like here so hostile markup never enters the repo.
+    # (The templates also `| escape` on output — the real fix — but keeping the
+    # stored value plain-text means a future template regression can't reintroduce
+    # the bug.) Drop tag-like <...> spans, then any stray angle brackets.
+    value = re.sub(r"<[^>]*>", " ", value)
+    value = value.replace("<", " ").replace(">", " ")
     # collapse any newlines/control chars to spaces, squeeze, trim, cap length.
     value = re.sub(r"[\x00-\x1f\x7f]", " ", value)
     value = re.sub(r"\s+", " ", value).strip()

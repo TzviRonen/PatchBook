@@ -40,8 +40,9 @@ fi
 cd "$SITE_DIR"
 echo "[*] Starting PatchBook (Jekyll) on port $PORT  →  http://localhost:${PORT}/"
 
-# JEKYLL_NO_BUNDLER=1 : use the globally-installed gems (the Gemfile is only
-#                       needed for the GitHub Pages CI build).
+# JEKYLL_NO_BUNDLER_REQUIRE=1 : use the globally-installed gems and skip
+#                       Bundler.setup (the Gemfile/lock is only needed for the
+#                       GitHub Pages CI build).
 # --baseurl ""        : serve at the root locally so http://localhost:$PORT/
 #                       works (production keeps baseurl "/patchbook").
-exec env JEKYLL_NO_BUNDLER=1 jekyll serve --host 0.0.0.0 --port "$PORT" --baseurl "" --watch
+exec env JEKYLL_NO_BUNDLER_REQUIRE=1 jekyll serve --host 0.0.0.0 --port "$PORT" --baseurl "" --watch

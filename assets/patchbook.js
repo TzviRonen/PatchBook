@@ -41,6 +41,31 @@ window.PatchBook = (function () {
     return base + q;
   }
 
+  // After a submission opens its GitHub issue, cover the form with a thank-you
+  // overlay and disable its controls so it can't be edited or resubmitted until
+  // the page is reloaded. `el` is the submitted form (validation) or its inner
+  // form (suggestion); we lock the enclosing `.community-form` box either way.
+  function lockForm(el) {
+    var box = el.closest(".community-form");
+    if (!box || box.dataset.locked) return;
+    box.dataset.locked = "1";
+    box.querySelectorAll("textarea, input, button, a").forEach(function (c) {
+      c.disabled = true;
+      c.tabIndex = -1;
+      c.setAttribute("aria-disabled", "true");
+    });
+    var ov = document.createElement("div");
+    ov.className = "community-thanks";
+    ov.setAttribute("role", "status");
+    var strong = document.createElement("strong");
+    strong.textContent = "Thanks for contributing!";
+    var span = document.createElement("span");
+    span.textContent = "Your submission will appear in a few minutes.";
+    ov.appendChild(strong);
+    ov.appendChild(span);
+    box.appendChild(ov);
+  }
+
   // Read a named control via form.elements — NOT form.<name>, which collides
   // with built-in HTMLFormElement properties (e.g. form.name is the form's own
   // name attribute, not the input named "name").
@@ -70,6 +95,7 @@ window.PatchBook = (function () {
 
     var title = "[validation] " + cve(el) + " — " + verdict;
     window.open(issueUrl(el, "validation", title, body), "_blank", "noopener");
+    lockForm(el);
     return false;
   }
 
@@ -85,6 +111,7 @@ window.PatchBook = (function () {
       "\n";
     var title = "[suggestion] " + cve(el);
     window.open(issueUrl(el, "suggestion", title, body), "_blank", "noopener");
+    lockForm(el);
     return false;
   }
 
