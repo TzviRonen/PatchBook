@@ -12,8 +12,8 @@ The two renderers read the same `_posts/*.md` files and apply the same CSS (`ass
 ## Local preview
 
 ```bash
-# from the repo root:
-./start_patchbook.sh
+# from the parent project root:
+./scripts/start_patchbook.sh
 # → picks a free port from $CONTAINER_PORTS and serves at http://localhost:<port>/
 ```
 
