@@ -126,6 +126,24 @@ check("aria-expanded reflects popover state",
 w.document.body.click();
 check("clicking outside closes it", !group.classList.contains("is-open"));
 
+// ── API unreachable: fail visibly, don't navigate to a dead endpoint ────
+{
+  const dead = html.replace(/data-api="[^"]*"/, 'data-api="http://127.0.0.1:4788"'); // nothing listening
+  const dom = new JSDOM(dead.replace(/<script src=[^>]*><\/script>/, ""),
+    { url: PAGE, runScripts: "dangerously", pretendToBeVisual: true });
+  const dw = dom.window;
+  dw.fetch = (u, o) => fetch(String(u), o);
+  dw.eval(JS);
+  await settle();
+  check("unreachable API is reported", /unavailable/i.test(dw.document.querySelector(".vote-status").textContent),
+        dw.document.querySelector(".vote-status").textContent);
+  let navigated2 = false;
+  dw._virtualConsole.on("jsdomError", e => { if (/navigation/i.test(e.message)) navigated2 = true; });
+  dw.document.querySelector('.vote-group[data-verdict="valid"] .vote-btn').click();
+  await settle();
+  check("click does not redirect to a dead login endpoint", !navigated2);
+}
+
 // ── edit flow still points at GitHub ────────────────────────────────────
 const link = w.document.querySelector(".community-edit");
 w.PatchBook.editOnGitHub(link);

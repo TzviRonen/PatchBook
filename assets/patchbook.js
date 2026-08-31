@@ -158,10 +158,15 @@ window.PatchBook = (function () {
         return r.json();
       })
       .then(function (state) {
+        delete root.dataset.offline;
         render(root, state);
         return state;
       })
       .catch(function () {
+        // Remember this so a click doesn't navigate to an unreachable login
+        // endpoint, which surfaces as a browser "can't reach this page" with
+        // nothing pointing at the real cause.
+        root.dataset.offline = "1";
         setStatus(root, "Vote counts unavailable", true);
       });
   }
@@ -192,6 +197,11 @@ window.PatchBook = (function () {
   function vote(button) {
     var root = bar(button);
     var verdict = button.closest(".vote-group").dataset.verdict;
+
+    if (root.dataset.offline) {
+      setStatus(root, "Voting is unavailable right now — try reloading", true);
+      return false;
+    }
 
     if (!token()) {
       login(root);
