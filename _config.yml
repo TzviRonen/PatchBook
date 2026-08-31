@@ -1,13 +1,17 @@
 title: PatchBook
 description: Windows kernel CVE analysis — binary diffs and patch breakdowns by the kernel-cve-pipeline
 url: "https://tzvironen.github.io"
-baseurl: "/patchbook"
+# Must match the repository name exactly — GitHub Pages serves a project site
+# at /<repo-name> and that path is case-sensitive. The repo is "PatchBook", so
+# a lowercase baseurl makes every relative_url asset (main.css, patchbook.js)
+# 404 on the live site while local preview looks fine.
+baseurl: "/PatchBook"
 author: tzvironen
 
 # Source repo backing the site — used to build edit-suggestion links (GitHub
 # web-editor & prefilled issue URLs). See _layouts/post.html and
 # assets/patchbook.js.
-github_repo: tzvironen/patchbook
+github_repo: TzviRonen/PatchBook
 github_branch: main
 
 # Vote API (Cloudflare Worker + D1, source in worker/). Counts and voter names

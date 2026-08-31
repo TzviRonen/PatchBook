@@ -25,7 +25,7 @@ npx wrangler d1 execute patchbook --remote --file=schema.sql
 npx wrangler d1 execute patchbook --remote --file=seed.sql   # optional: old frontmatter marks
 
 # 2. GitHub OAuth app  (github.com/settings/developers → New OAuth App)
-#    Homepage URL:               https://tzvironen.github.io/patchbook
+#    Homepage URL:               https://tzvironen.github.io/PatchBook
 #    Authorization callback URL: https://patchbook-votes.tzvironen.workers.dev/auth/callback
 npx wrangler secret put GITHUB_CLIENT_ID --env=""
 npx wrangler secret put GITHUB_CLIENT_SECRET --env=""

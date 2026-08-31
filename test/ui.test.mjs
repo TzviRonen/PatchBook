@@ -172,7 +172,7 @@ check("clicking outside closes it", !group.classList.contains("is-open"));
 const link = w.document.querySelector(".community-edit");
 w.PatchBook.editOnGitHub(link);
 check("edit link opens the GitHub web editor (PR flow)",
-      link.href === "https://github.com/tzvironen/patchbook/edit/main/_posts/2026-08-29-cve-2026-33827-tcpip-remote-code-execution.md", link.href);
+      link.href === "https://github.com/TzviRonen/PatchBook/edit/main/_posts/2026-08-29-cve-2026-33827-tcpip-remote-code-execution.md", link.href);
 
 console.log(failures ? `\n${failures} FAILED` : "\nall passed");
 process.exit(failures?1:0);
