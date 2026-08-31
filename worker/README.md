@@ -75,7 +75,7 @@ is a real SQLite database under `.wrangler/`, and `wrangler dev` runs the same
 npm install
 cp .dev.vars.example .dev.vars
 npm run db:local        # apply schema.sql to the local D1
-npm run dev             # → http://127.0.0.1:8787
+npm run dev             # → http://127.0.0.1:3003
 ```
 
 **Use `--env dev`.** The preview server's `http://127.0.0.1:…` origin is only in
@@ -83,7 +83,7 @@ the `[env.dev]` allowlist, deliberately — production accepts redirects to
 `https://tzvironen.github.io` and nothing else, and `test.mjs` fails the build if
 a localhost or wildcard origin ever appears in the production vars.
 
-`wrangler dev` serves on `http://127.0.0.1:8787`; point `votes_api` at it and
+`npm run dev` serves on `http://127.0.0.1:3003`; point `votes_api` at it and
 run the site with `../serve.sh`. You'll need a second OAuth app whose callback
 URL is the local Worker, since GitHub matches the callback host exactly.
 

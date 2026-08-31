@@ -11,16 +11,22 @@ The two renderers read the same `_posts/*.md` files and apply the same CSS (`ass
 
 ## Local preview
 
+The whole stack — vote Worker plus site, wired together — in one command:
+
 ```bash
-# from the parent project root:
-./scripts/start_patchbook.sh
-# → picks a free port from $CONTAINER_PORTS and serves at http://localhost:<port>/
+./scripts/start_dev.sh            # Flask preview  → :4123, vote API → :3003
+./scripts/start_dev.sh --jekyll   # the real production renderer instead
 ```
 
-Or directly:
+It points `votes_api` at the local Worker while running and **restores it on
+exit**, which matters: committing a localhost `votes_api` would silently break
+votes in production.
+
+Site only, no vote backend:
 
 ```bash
-python patchbook/serve.py 4000
+python patchbook/serve.py 4000    # or, from the parent root:
+./scripts/start_patchbook.sh      # picks a free port from $CONTAINER_PORTS
 ```
 
 ## Production deploy (GitHub Pages)

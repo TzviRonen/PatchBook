@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# Bring up the full local PatchBook stack: the vote Worker (Cloudflare workerd
+# + a local D1) and the site preview, wired together.
+#
+# Usage:
+#   ./scripts/start_dev.sh            # Flask preview (no Ruby needed)
+#   ./scripts/start_dev.sh --jekyll   # the real production renderer
+#
+#   WORKER_PORT=3003 SITE_PORT=4123 ./scripts/start_dev.sh
+#
+# While running, `votes_api` in _config.yml is pointed at the local Worker. It
+# is restored on exit — committing that line would silently break votes in
+# production, which is the whole reason this script exists.
+#
+# Ctrl-C stops both processes.
+set -euo pipefail
+
+SITE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+WORKER_DIR="$SITE_DIR/worker"
+CONFIG="$SITE_DIR/_config.yml"
+
+WORKER_PORT="${WORKER_PORT:-3003}"
+SITE_PORT="${SITE_PORT:-4123}"
+USE_JEKYLL=0
+[[ "${1:-}" == "--jekyll" ]] && USE_JEKYLL=1
+
+WORKER_PID=""
+SITE_PID=""
+CONFIG_BACKUP=""
+
+cleanup() {
+  trap - EXIT INT TERM
+  echo
+  echo "[*] Shutting down…"
+  [[ -n "$SITE_PID"   ]] && kill "$SITE_PID"   2>/dev/null || true
+  [[ -n "$WORKER_PID" ]] && kill "$WORKER_PID" 2>/dev/null || true
+  # Restore _config.yml even if we were killed mid-run.
+  if [[ -n "$CONFIG_BACKUP" && -f "$CONFIG_BACKUP" ]]; then
+    mv "$CONFIG_BACKUP" "$CONFIG"
+    echo "[*] Restored votes_api in _config.yml"
+  fi
+}
+trap cleanup EXIT INT TERM
+
+# ── preflight ────────────────────────────────────────────────────────────────
+
+if [[ ! -d "$WORKER_DIR/node_modules" ]]; then
+  echo "[*] Installing worker dependencies…"
+  (cd "$WORKER_DIR" && npm install --silent)
+fi
+
+if [[ ! -f "$WORKER_DIR/.dev.vars" ]]; then
+  echo "[*] Creating .dev.vars from the example (add your dev OAuth app's"
+  echo "    credentials to it if you want to test the GitHub login flow)."
+  cp "$WORKER_DIR/.dev.vars.example" "$WORKER_DIR/.dev.vars"
+fi
+
+# The local D1 is keyed by database_id, so changing that in wrangler.toml
+# orphans the old database. Re-applying the schema is idempotent and cheap.
+echo "[*] Ensuring the local D1 schema exists…"
+(cd "$WORKER_DIR" && npm run --silent db:local >/dev/null 2>&1) \
+  || { echo "[!] Could not apply schema.sql to the local D1." >&2; exit 1; }
+
+# The Worker only accepts OAuth returns to origins in [env.dev].ALLOWED_ORIGINS.
+# A site port outside that list still renders, but login redirects will 400.
+if ! grep -A2 '^\[env\.dev\.vars\]' "$WORKER_DIR/wrangler.toml" | grep -q "127.0.0.1:${SITE_PORT}"; then
+  echo "[!] Port $SITE_PORT is not in [env.dev].ALLOWED_ORIGINS (wrangler.toml)."
+  echo "    Voting will work, but GitHub login will be rejected with a 400."
+fi
+
+# ── vote API ─────────────────────────────────────────────────────────────────
+
+echo "[*] Starting the vote Worker on port $WORKER_PORT…"
+(cd "$WORKER_DIR" && npx wrangler dev --env dev --local --port "$WORKER_PORT" >/dev/null 2>&1) &
+WORKER_PID=$!
+
+for _ in $(seq 1 40); do
+  if curl -fsS -m 2 "http://127.0.0.1:${WORKER_PORT}/api/me" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+if ! curl -fsS -m 2 "http://127.0.0.1:${WORKER_PORT}/api/me" >/dev/null 2>&1; then
+  echo "[!] The Worker did not come up on port $WORKER_PORT." >&2
+  exit 1
+fi
+echo "[+] Vote API ready  →  http://127.0.0.1:${WORKER_PORT}"
+
+# ── point the site at it ─────────────────────────────────────────────────────
+
+CONFIG_BACKUP="$(mktemp)"
+cp "$CONFIG" "$CONFIG_BACKUP"
+sed -i "s|^votes_api:.*|votes_api: \"http://127.0.0.1:${WORKER_PORT}\"|" "$CONFIG"
+echo "[*] votes_api → http://127.0.0.1:${WORKER_PORT} (restored on exit)"
+
+# ── site ─────────────────────────────────────────────────────────────────────
+
+if [[ "$USE_JEKYLL" == "1" ]]; then
+  echo "[*] Starting Jekyll on port $SITE_PORT…"
+  (cd "$SITE_DIR" && ./serve.sh "$SITE_PORT") &
+else
+  echo "[*] Starting the Flask preview on port $SITE_PORT…"
+  echo "    (note: serve.py does not evaluate Liquid — use --jekyll before pushing)"
+  (cd "$SITE_DIR" && python3 serve.py "$SITE_PORT") &
+fi
+SITE_PID=$!
+
+echo
+echo "[+] PatchBook dev stack up:"
+echo "      site      http://127.0.0.1:${SITE_PORT}/"
+echo "      vote API  http://127.0.0.1:${WORKER_PORT}/"
+echo "    Ctrl-C to stop both."
+echo
+
+# Exit as soon as either process dies, so a crashed Worker doesn't leave a
+# half-working site behind.
+wait -n "$WORKER_PID" "$SITE_PID"
