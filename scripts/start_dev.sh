@@ -61,11 +61,25 @@ echo "[*] Ensuring the local D1 schema exists…"
 (cd "$WORKER_DIR" && npm run --silent db:local >/dev/null 2>&1) \
   || { echo "[!] Could not apply schema.sql to the local D1." >&2; exit 1; }
 
-# The Worker only accepts OAuth returns to origins in [env.dev].ALLOWED_ORIGINS.
-# A site port outside that list still renders, but login redirects will 400.
-if ! grep -A2 '^\[env\.dev\.vars\]' "$WORKER_DIR/wrangler.toml" | grep -q "127.0.0.1:${SITE_PORT}"; then
+# The Worker only serves CORS headers and accepts OAuth returns for origins in
+# [env.dev].ALLOWED_ORIGINS. A site port outside that list renders fine, but the
+# counts fetch is blocked and login 400s — so check it up front.
+#
+# Read the value out of the section rather than by line offset: a comment added
+# above it must not turn this check into a no-op that always warns.
+DEV_ORIGINS="$(awk '
+  /^\[env\.dev\.vars\]/ { in_section = 1; next }
+  /^\[/                 { in_section = 0 }
+  in_section && /^ALLOWED_ORIGINS/ { print; exit }
+' "$WORKER_DIR/wrangler.toml")"
+
+if [[ -z "$DEV_ORIGINS" ]]; then
+  echo "[!] No ALLOWED_ORIGINS found under [env.dev.vars] in wrangler.toml." >&2
+elif [[ "$DEV_ORIGINS" != *"127.0.0.1:${SITE_PORT}"* && "$DEV_ORIGINS" != *"localhost:${SITE_PORT}"* ]]; then
   echo "[!] Port $SITE_PORT is not in [env.dev].ALLOWED_ORIGINS (wrangler.toml)."
-  echo "    Voting will work, but GitHub login will be rejected with a 400."
+  echo "    Vote counts will fail to load and GitHub login will return 400."
+  echo "    Add both http://127.0.0.1:${SITE_PORT} and http://localhost:${SITE_PORT}"
+  echo "    — browsers treat them as different origins."
 fi
 
 # ── vote API ─────────────────────────────────────────────────────────────────
