@@ -1,0 +1,9 @@
+# Copy to `.dev.vars` for local development (`npm run dev`). Fake values are
+# fine: the OAuth values are only exercised if you actually walk the GitHub
+# consent flow, and TOKEN_SECRET just has to be consistent within a session.
+#
+# `.dev.vars` is gitignored. Real secrets are set with `wrangler secret put` and
+# never live in this repo — it's public.
+GITHUB_CLIENT_ID=local-dev-client-id
+GITHUB_CLIENT_SECRET=local-dev-client-secret
+TOKEN_SECRET=local-dev-token-signing-secret

@@ -1,124 +1,137 @@
-# PatchBook Architecture — serverless community validation
+# PatchBook Architecture
 
-How PatchBook serves a static site **and** processes reader-submitted validations
-with no backend server, using only free GitHub services.
+How PatchBook serves a static site **and** takes reader feedback on
+AI-generated analyses, using GitHub Pages, GitHub pull requests, and one small
+Cloudflare Worker.
 
-## The core idea
+## The split
 
-GitHub doesn't have a single service that both hosts static files and runs code —
-but combining two of its services gives you exactly that:
+Reader feedback comes in two shapes with opposite requirements, so they use two
+different backends:
 
-| Service | Role | Runs code? | Cost |
-|---|---|---|---|
-| **GitHub Pages** | Hosts the built site (`_site/`) | No — serves static files only | Free (public repos) |
-| **GitHub Actions** | Reacts to events (issues, pushes) on throwaway Ubuntu VMs | Yes — Python, Ruby, anything | Free (public repos, generous quota) |
+| | Votes (`valid` / `AI-slop`) | Edit suggestions |
+|---|---|---|
+| **Wants to be** | instant, one per person, attributable | reviewed before it lands |
+| **Backend** | Cloudflare Worker + D1 (`worker/`) | GitHub pull requests |
+| **Visible** | immediately, on click | only after the PR is merged |
+| **Stored in** | the vote database — never the repo | the post's git history |
+| **Identity** | GitHub OAuth (login required) | the PR author's GitHub account |
 
-Pages never executes anything at request time. All computation happens
-*event-time* on Actions runners, and the result is committed back to the repo,
-rebuilt, and redeployed as new static files.
-
-## Data flow: what happens when a reader clicks "Validate"
+Votes are read/write-hot state that has to be correct per-account, which git
+can't express. Post content is versioned prose with a review gate, which is
+exactly what git is for. Mixing them — the earlier design recorded votes as
+`validations:` frontmatter via a bot commit — meant a ~2 minute delay per vote
+and no way to stop one person voting twice.
 
 ```
-Reader clicks "Validate" on a post
-        │  (assets/patchbook.js — pure client-side, no POST)
-        ▼
-Prefilled GitHub issue opens, labelled `validation`,
-body contains a ```yaml block: {type, post, verdict, note}
-        │  (reader submits the issue with their GitHub account)
-        ▼
-.github/workflows/validations.yml triggers on the issue event
-        │  GitHub boots a fresh ubuntu-latest VM:
-        │    1. actions/checkout clones the repo
-        │    2. actions/setup-python installs Python 3.11
-        │    3. python scripts/apply_validation.py parses & sanitizes the
-        │       issue body (hostile input!) and appends the mark to the
-        │       post's `validations:` frontmatter
-        │    4. commits & pushes to main, comments on + closes the issue
-        │    5. VM is destroyed
-        ▼
-.github/workflows/pages.yml rebuilds the site
-        │  Another throwaway VM: `jekyll build` → upload `_site`
-        │  → actions/deploy-pages publishes it
-        ▼
-Pages serves the new snapshot: the "N valid" badge count and the
-marks list update (both rendered by _layouts/post.html from frontmatter)
+                    ┌────────────── votes: instant ──────────────┐
+                    │                                            │
+Reader ──click──►  Cloudflare Worker  ──►  D1 (SQLite)
+       ◄── JSON ──  /api/votes             PRIMARY KEY (post_id, user_id)
+       │                                   └─ one vote per GitHub account
+       └── GitHub OAuth ──► identity (login required to vote)
+
+
+Reader ──"Edit on GitHub"──► fork ──► pull request ──► maintainer merges
+                                                            │
+                                            push to main ───┘
+                                                            ▼
+                                            pages.yml: jekyll build → Pages
+                                            (the edit becomes visible here)
 ```
 
-The static host never "pulls" the repo — it receives a freshly built snapshot
-after every push. Latency is ~1–2 minutes per validation (Actions run +
-rebuild), which is the trade-off for having no server at all.
+## Votes
 
-### Where each piece lives
+Everything lives in `worker/` — see `worker/README.md` for deploy steps and the
+endpoint table.
 
-- `_layouts/post.html` — renders the tally badges and marks from each post's
-  `validations:` frontmatter (Liquid `where` filters).
-- `assets/patchbook.js` — builds the prefilled issue URLs. Client-side only.
-- `scripts/apply_validation.py` — the "handler". Runs **only on Actions
-  runners** (or locally for testing) — never on the web host. Treats the issue
-  body as hostile: verdict allowlist, path-traversal guard, control-char
-  sanitizing, YAML escaping.
-- `.github/workflows/validations.yml` — issue → frontmatter-commit bot.
-- `.github/workflows/pages.yml` — Jekyll build + Pages deploy.
-- `validations:` frontmatter in `_posts/*.md` — the "database". No external
-  storage; marks live in git and survive republishing
-  (`publish_to_patchbook.py` carries the block forward).
+- **One vote per user is a database constraint**, not application logic:
+  `PRIMARY KEY (post_id, user_id)` plus an UPSERT. Voting again *changes* your
+  verdict; it can never double-count. Clicking your current verdict retracts it.
+- **Immediacy** comes from two things: the count is fetched client-side on page
+  load (`Cache-Control: no-store`, so Pages' static caching is irrelevant), and
+  the click updates the number optimistically before the request returns,
+  reconciling with the server response when it lands.
+- **The voter list is fetched with the counts** in the same response, and
+  rendered *only* into the popover anchored to the count — never into the
+  article. It's reachable by hover, keyboard focus, and tap.
+- **Identity is GitHub OAuth**, requested with no scopes: the consent screen
+  grants nothing beyond public identity, and GitHub's access token is discarded
+  right after the identity lookup. What we keep is our own HMAC-signed session
+  token, returned in the URL *fragment* and held in `localStorage` — not a
+  cookie, because the Worker is a different origin from `github.io` and browsers
+  block third-party cookies.
+- **Votes are not in git.** That's the deliberate trade against the old design:
+  the repo is no longer the single source of truth, in exchange for votes that
+  actually work. The database is the record; back it up with
+  `wrangler d1 export`.
 
-## Setup from scratch
+## Edit suggestions
 
-To reproduce this on a new repo:
+Unchanged, and entirely GitHub's:
 
-1. **Public GitHub repo** containing the Jekyll site (public keeps Pages and
-   Actions free, and lets anyone open validation issues).
-2. **Enable Pages via Actions**: repo → Settings → Pages → Source =
-   **GitHub Actions** (not "deploy from branch").
-3. **Add `pages.yml`**: triggers on `push` to `main` **and `workflow_dispatch`**
-   (the dispatch trigger is load-bearing — see the gotcha below); permissions
-   `contents: read`, `pages: write`, `id-token: write`; steps: checkout →
-   setup-ruby (bundler-cache) → `jekyll build` → upload-pages-artifact →
-   deploy-pages.
-4. **Create the issue labels** the bot filters on: `validation` (plus
-   `suggestion` and `invalid` for the other flows). Labels must exist before
-   prefilled issue URLs can apply them.
-5. **Add `validations.yml`**: triggers on `issues: [opened, labeled]`, gated on
-   the `validation` label; permissions `contents: write`, `issues: write`
-   (and `actions: write` for the rebuild dispatch below). Uses only the
-   built-in `GITHUB_TOKEN` — no secrets to create or rotate.
-6. **Point the client at the repo**: `_config.yml` keys `github_repo` /
-   `github_branch` feed `data-repo` / `data-branch` attributes that
-   `patchbook.js` uses to build issue URLs.
+1. "Edit on GitHub" opens the web editor at the post's source file. For readers
+   without write access GitHub forks the repo and opens a pull request on save.
+2. `.github/pull_request_template.md` asks the author to add themselves to the
+   post's `editors:` frontmatter **in the same PR**.
+3. You review and merge. The push to `main` triggers `pages.yml`, Jekyll
+   rebuilds, and both the edit and the new credit go live together.
 
-## ⚠️ Gotcha: bot pushes don't trigger workflows
+There is no automation anywhere in this path — no bot writes post content and no
+bot writes credits. The "Edited by" list at the bottom of a post is exactly the
+`editors:` block that a human wrote and a human merged, which is why it can be
+trusted at face value.
 
-GitHub **suppresses workflow runs for events created with the default
-`GITHUB_TOKEN`** (to prevent infinite workflow recursion). So the validation
-bot's `git push` does *not* fire `pages.yml`'s `on: push` — the mark lands in
-the repo but the live site stays stale until the next human push.
+`publish_to_patchbook.py` carries the `editors:` block forward when the pipeline
+republishes a post (`_existing_block`), so re-running the pipeline over a CVE
+never wipes contributor credits.
 
-The documented exceptions are `workflow_dispatch` and `repository_dispatch`.
-The fix: after pushing, `validations.yml` explicitly dispatches the Pages
-build —
+## Where each piece lives
 
-```yaml
-# in the commit step, after `git push`:
-gh workflow run pages.yml            # needs `actions: write` permission
-```
-
-This works because `pages.yml` already declares `workflow_dispatch:` as a
-trigger. (The alternative — pushing with a personal access token so the push
-event fires normally — works too, but means creating and rotating a secret,
-which this design avoids.)
+- `worker/src/index.js` — vote API and OAuth. Runs on Cloudflare, not GitHub.
+- `worker/schema.sql` — the vote table and its one-vote-per-user key.
+- `assets/patchbook.js` — fetches/renders counts and the voter popover, casts
+  votes, and builds the GitHub web-editor / suggestion-issue URLs.
+- `_layouts/post.html` — the vote bar, the popover markup, and the "Edited by"
+  section rendered from `editors:` frontmatter.
+- `_config.yml` — `votes_api` (Worker URL; blank disables the vote UI) and
+  `github_repo` / `github_branch` (feeds the edit links).
+- `.github/workflows/pages.yml` — Jekyll build + Pages deploy on push to `main`.
+- `.github/pull_request_template.md` — tells PR authors to credit themselves.
 
 ## Security model
 
-- Anyone on the internet can open an issue, so **the issue body is untrusted
-  input**. `apply_validation.py` enforces: verdict allowlist
-  (`valid` / `ai-slop` / `needs-fixing`), strict `_posts/*.md` path regex +
-  resolved-path containment check, control-character stripping, length caps,
-  and double-quoted YAML escaping.
-- Identity comes from GitHub itself: submitting requires a GitHub login, and
-  the issue *author* (from the trusted event payload, not the body) is who the
-  mark is attributed to.
-- The workflow runs with the scoped `GITHUB_TOKEN` only — no long-lived
-  secrets; a malicious issue can at worst be rejected (commented + labelled
-  `invalid`).
+- **Vote endpoints treat everything as hostile.** Post ids are matched against
+  a strict `_posts/*.md` regex, verdicts against an allowlist, notes are
+  whitespace-collapsed and length-capped, and all writes are parameter-bound.
+- **`user_id`, not `login`, is the identity.** GitHub usernames can be changed
+  and reused; the numeric id can't. `login` is refreshed on every vote so
+  displayed names stay current.
+- **`return` URLs are validated against `ALLOWED_ORIGINS`.** Without that,
+  `/auth/login` would be an open redirect leaking session tokens — the single
+  most security-sensitive line in the Worker. Production allows exactly one
+  origin; the preview server's localhost origin lives in `[env.dev]` and is
+  never deployed. `worker/test.mjs` fails if a wildcard, a localhost, or a
+  non-HTTPS origin appears in the production vars. The OAuth `state` parameter
+  is HMAC-signed and expires in 10 minutes.
+- **The OAuth app requests no scopes and holds no repo access.** A leaked
+  client secret cannot read or write this repo, cannot read a reader's private
+  data, and cannot mint a token with permissions the app never registered. Post
+  content changes through exactly one path: a pull request a human merges.
+- **Blast radius of a `TOKEN_SECRET` leak is vote fraud only** — forged sessions
+  can cast votes and nothing else. Recovery is rotating the secret, which
+  invalidates every session at once. GitHub's own access token is discarded
+  immediately after the identity lookup, so there is nothing else to steal.
+- **CORS is origin-allowlisted**, not `*`.
+- **No long-lived GitHub credentials exist.** The Worker holds an OAuth client
+  secret and a token-signing secret; Pages deployment uses the built-in
+  `GITHUB_TOKEN`. Nothing has write access to the repo except you merging PRs.
+
+## ⚠️ Gotcha: bot pushes don't trigger workflows
+
+Kept here because it will bite again if any automation is ever added back:
+GitHub suppresses workflow runs for events created with the default
+`GITHUB_TOKEN` (recursion prevention), so a bot's `git push` does *not* fire
+`pages.yml`'s `on: push`. The documented escape hatches are `workflow_dispatch`
+and `repository_dispatch` — which is why `pages.yml` still declares
+`workflow_dispatch:`. Human-merged PRs are unaffected.

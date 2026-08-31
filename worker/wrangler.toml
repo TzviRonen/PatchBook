@@ -1,0 +1,37 @@
+name = "patchbook-votes"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# Origins allowed to call the API and to be redirected back to after OAuth.
+#
+# This list is the most security-sensitive setting in the Worker: it is what
+# stops /auth/login from being an open redirect that leaks session tokens (see
+# safeReturnUrl in src/index.js). Production must contain only origins we
+# control, and must never contain a wildcard. worker/test.mjs enforces both.
+[vars]
+ALLOWED_ORIGINS = "https://tzvironen.github.io"
+
+# `binding` is the name the code sees as `env.DB` — it is NOT the database name.
+# `wrangler d1 create` suggests naming it after the database; don't, or
+# src/index.js's env.DB is undefined and every request 500s.
+[[d1_databases]]
+binding = "DB"
+database_name = "patchbook"
+database_id = "14dfdab5-b75e-470f-8379-ef39160fbac7"
+
+# Local development only — adds the Jekyll/Flask preview server as an allowed
+# origin. Never deployed: run it with `wrangler dev --env dev`. Keeping this out
+# of the production vars means a localhost redirect is not accepted by the live
+# Worker.
+[env.dev.vars]
+ALLOWED_ORIGINS = "https://tzvironen.github.io,http://127.0.0.1:4000,http://127.0.0.1:4123"
+
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "patchbook"
+database_id = "14dfdab5-b75e-470f-8379-ef39160fbac7"
+
+# Secrets — set with `wrangler secret put <NAME>`, never in this file:
+#   GITHUB_CLIENT_ID      OAuth app client id
+#   GITHUB_CLIENT_SECRET  OAuth app client secret
+#   TOKEN_SECRET          random 32+ bytes; signs session tokens & OAuth state

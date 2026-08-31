@@ -53,42 +53,53 @@ Posts land in `_posts/YYYY-MM-DD-cve-XXXX-slug.md` with Jekyll frontmatter:
 | `cve_id` | no | blue badge |
 | `cvss` | no | color-coded badge (red ≥9, orange ≥7, yellow ≥4) |
 | `excerpt` | no | homepage card text |
-| `validations` | no | community marks — see below |
+| `editors` | no | "Edited by" credits — see below |
 
-## Community validation & suggestions
+## Community feedback
 
-Because every post is AI-generated, readers can fact-check them — with no backend
-and no cost. Each post page (above the article) shows a **Community check** tally
-plus two actions:
+Every post is AI-generated, so readers can push back on them in two ways. The
+two paths are deliberately different — see `ARCHITECTURE.md` for the reasoning.
 
-- **Validate this post** — pick a verdict (`valid` / `ai-slop` / `needs-fixing`),
-  add your name + contact. This opens a prefilled GitHub **issue**; the
-  `Apply community validation` Action
-  (`.github/workflows/validations.yml`) parses it, appends the mark to the post's
-  `validations:` frontmatter, commits, and closes the issue. The commit
-  retriggers the Pages build, so the mark appears on the site.
-- **Suggest a change** — *Edit on GitHub* opens the web editor (auto-forks and
-  opens a pull request), or the text box opens a prefilled suggestion issue.
+### Votes — instant, one per GitHub account
 
-All submission links are built client-side in `assets/patchbook.js` from
-`site.github_repo` / `site.github_branch` (set in `_config.yml`). The
-`scripts/apply_validation.py` parser sanitizes every field (verdict allowlist,
-length caps, `_posts/*.md` path-traversal guard).
+Each post shows a **Community check** bar with `Valid` and `AI-slop` buttons and
+a live count beside each. Voting requires a GitHub login (OAuth, no scopes).
+The count updates the moment you click; the database enforces one vote per
+account per post, so voting again changes your verdict and clicking the verdict
+you already hold retracts it.
 
-**Repo setup note:** create the `validation` and `suggestion` labels in the
-GitHub repo — GitHub silently drops the `labels=` URL param for labels that
-don't exist, and the validation workflow is gated on the `validation` label.
+**Hovering the count** (or focusing/tapping it) shows who voted. That list is
+only ever in the popover — never in the post body.
 
-`validations:` frontmatter shape:
+Votes live in the D1 database behind the Cloudflare Worker in `worker/`, not in
+this repo. `_config.yml`'s `votes_api` points the site at it; leave it blank to
+turn the vote UI off.
+
+### Edit suggestions — via pull request, visible only once merged
+
+**Edit on GitHub** opens the web editor on the post's source; saving auto-forks
+and opens a PR. The change appears on the site only after you merge it and Pages
+rebuilds. The text box next to it opens a prefilled `suggestion` issue instead,
+for readers who'd rather just describe the problem.
+
+PR authors credit themselves by adding to the post's `editors:` frontmatter in
+the same PR (`.github/pull_request_template.md` asks them to). Nothing generates
+that list, so what's rendered at the bottom of a post is exactly what a human
+wrote and a human merged:
 
 ```yaml
-validations:
-  - verdict: valid          # valid | ai-slop | needs-fixing
-    name: Jane Doe
-    contact: https://x.com/jane   # email, x.com, or linkedin URL
+editors:
+  - name: jane-doe
     date: 2026-06-20
     note: Confirmed the double-free path.   # optional
+  - some-other-user                          # bare username also works
 ```
+
+`publish_to_patchbook.py` carries this block forward, so re-publishing a post
+never wipes contributor credits.
+
+**Repo setup note:** create the `suggestion` label in the GitHub repo — GitHub
+silently drops the `labels=` URL param for labels that don't exist.
 
 ## Deploy (GitHub Pages)
 
@@ -100,15 +111,15 @@ uses `baseurl: /patchbook` from `_config.yml`.
 
 ```
 patchbook/
-├── _config.yml          site config (baseurl, github_repo, plugins)
+├── _config.yml          site config (baseurl, github_repo, votes_api, plugins)
 ├── _layouts/            default / home / post templates
 ├── _posts/              published CVE analyses (markdown + frontmatter)
 ├── assets/
 │   ├── main.css         design system / styling
-│   └── patchbook.js     client-side validation & suggestion submitters
-├── scripts/
-│   └── apply_validation.py   parses validation issues (run by the Action)
-├── .github/workflows/   pages.yml (deploy) · validations.yml (apply marks)
+│   └── patchbook.js     vote UI (live counts, voter popover) + edit links
+├── worker/              Cloudflare Worker + D1: the vote API (see its README)
+├── test/                front-end tests (jsdom, stubbed API)
+├── .github/workflows/   pages.yml (build + deploy)
 ├── setup.sh             install Ruby + Jekyll
 ├── serve.sh             local preview server
 └── DEVELOPMENT.md       notes on the two-renderer history

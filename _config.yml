@@ -4,11 +4,16 @@ url: "https://tzvironen.github.io"
 baseurl: "/patchbook"
 author: tzvironen
 
-# Source repo backing the site — used to build community validation /
-# suggestion links (prefilled GitHub issue & web-editor URLs). See
-# _layouts/post.html and assets/patchbook.js.
+# Source repo backing the site — used to build edit-suggestion links (GitHub
+# web-editor & prefilled issue URLs). See _layouts/post.html and
+# assets/patchbook.js.
 github_repo: tzvironen/patchbook
 github_branch: main
+
+# Vote API (Cloudflare Worker + D1, source in worker/). Counts and voter names
+# are read live from here on every page load; nothing about votes is stored in
+# this repo. Leave blank to disable the vote UI entirely.
+votes_api: "https://patchbook-votes.tzvironen.workers.dev"
 
 theme: null
 markdown: kramdown
@@ -31,3 +36,4 @@ exclude:
   - scripts
   - setup.sh
   - serve.sh
+  - worker

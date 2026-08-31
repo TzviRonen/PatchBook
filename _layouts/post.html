@@ -3,14 +3,17 @@ layout: default
 ---
 <div class="page page-post">
   {%- comment -%}
-    Community validation marks live in this post's `validations:` frontmatter
-    (see scripts/apply_validation.py). The tally sits in the header beside the
-    "All posts" button; the submission actions form a toolbar under the title.
-    All submissions are client-side: prefilled GitHub issue / web-editor URLs.
+    Two independent feedback channels, deliberately kept apart:
+
+    - Votes (valid / AI-slop) live in the D1 database behind the Worker in
+      worker/. Counts render client-side from a live API call, so they appear
+      immediately; one vote per GitHub account is enforced by the database. The
+      list of who voted is fetched with the counts and shown only in the hover
+      popover on the count itself — never in the post body.
+    - Edit suggestions go through GitHub pull requests. They appear on the site
+      only once a PR is merged. PR authors add themselves to the `editors:`
+      frontmatter list in the same PR; nothing automated writes that block.
   {%- endcomment -%}
-  {% assign valid_marks  = page.validations | where: "verdict", "valid" %}
-  {% assign slop_marks   = page.validations | where: "verdict", "ai-slop" %}
-  {% assign fix_marks    = page.validations | where: "verdict", "needs-fixing" %}
 
   <div class="post-header">
     <div class="post-header-meta">
@@ -41,45 +44,63 @@ layout: default
          data-post-path="{{ page.path | escape }}"
          data-cve="{{ page.cve_id | escape }}"
          data-repo="{{ site.github_repo | escape }}"
-         data-branch="{{ site.github_branch | escape }}">
-      <div class="community-tally" title="Reader fact-check of this AI-generated post">
+         data-branch="{{ site.github_branch | escape }}"
+         data-api="{{ site.votes_api | escape }}">
+
+      {%- comment -%}
+        Counts start as "–" and are filled by the API response. Each count is a
+        button so the voter popover is reachable by keyboard and touch, not just
+        hover.
+      {%- endcomment -%}
+      <div class="votes" title="Reader fact-check of this AI-generated post">
         <span class="community-tally-label">Community check</span>
-        <span class="badge green"  title="Marked valid">{{ valid_marks | size }} valid</span>
-        <span class="badge red"    title="Flagged as AI slop">{{ slop_marks | size }} AI-slop</span>
-        <span class="badge yellow" title="Flagged as needing fixes">{{ fix_marks | size }} needs fixing</span>
+
+        {% assign vote_specs = "valid|Valid|green|✓,ai-slop|AI-slop|red|✗" | split: "," %}
+        {% for spec in vote_specs %}
+          {% assign parts = spec | split: "|" %}
+          <span class="vote-group" data-verdict="{{ parts[0] }}">
+            <button type="button"
+                    class="vote-btn badge {{ parts[2] }}"
+                    aria-pressed="false"
+                    title="Vote {{ parts[1] }}"
+                    onclick="return PatchBook.vote(this)">{{ parts[3] }} {{ parts[1] }}</button>
+            <button type="button"
+                    class="vote-count"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    title="Who voted {{ parts[1] }}">–</button>
+            <span class="voter-popover" role="group" aria-label="Readers who voted {{ parts[1] }}">
+              <ul class="voter-list"></ul>
+            </span>
+          </span>
+        {% endfor %}
+
+        <span class="vote-status" role="status"></span>
       </div>
 
+      <noscript>
+        <span class="muted small">Enable JavaScript to see and cast community votes.</span>
+      </noscript>
+
       <div class="community-actions">
-      <details class="community-box">
-        <summary class="btn btn-muted">Validate</summary>
-        <form class="community-form" onsubmit="return PatchBook.submitValidation(this, 'valid')">
-          <p class="muted small">Posts here are AI-generated and may be wrong. Mark this analysis as correct. Opens a prefilled GitHub issue.</p>
-          <textarea name="note" rows="2" maxlength="500" placeholder="Optional note"></textarea>
-          <button type="submit" class="btn btn-blue">Open validation issue →</button>
-        </form>
-      </details>
-
-      <details class="community-box">
-        <summary class="btn btn-muted">AI-slop</summary>
-        <form class="community-form" onsubmit="return PatchBook.submitValidation(this, 'ai-slop')">
-          <p class="muted small">Posts here are AI-generated and may be wrong. Flag this analysis as AI slop. Opens a prefilled GitHub issue.</p>
-          <textarea name="note" rows="2" maxlength="500" placeholder="Optional note"></textarea>
-          <button type="submit" class="btn btn-muted">Open validation issue →</button>
-        </form>
-      </details>
-
-      <details class="community-box">
-        <summary class="btn btn-muted">Suggest change</summary>
-        <div class="community-form">
-          <p class="muted small">Found an error? Edit the source directly on GitHub (opens a pull request automatically), or describe the change and we'll open an issue.</p>
-          <a class="btn btn-blue community-edit" href="#" target="_blank" rel="noopener" onclick="return PatchBook.editOnGitHub(this)">✎ Edit on GitHub (opens a PR)</a>
-          <form onsubmit="return PatchBook.submitSuggestion(this)">
-            <textarea name="suggestion" rows="4" maxlength="2000" placeholder="Describe the suggested change…" required></textarea>
-            <button type="submit" class="btn btn-muted">Open suggestion issue →</button>
-          </form>
-        </div>
-      </details>
-
+        <details class="community-box">
+          <summary class="btn btn-muted">Suggest change</summary>
+          <div class="community-form">
+            <p class="muted small">
+              Posts here are AI-generated and may be wrong. Edit the source directly on
+              GitHub — saving opens a pull request. Add yourself to the post's
+              <code>editors:</code> list in the same PR and your name will appear at the
+              bottom once it's merged.
+            </p>
+            <a class="btn btn-blue community-edit" href="#" target="_blank" rel="noopener"
+               onclick="return PatchBook.editOnGitHub(this)">✎ Edit on GitHub (opens a PR)</a>
+            <form onsubmit="return PatchBook.submitSuggestion(this)">
+              <textarea name="suggestion" rows="4" maxlength="2000"
+                        placeholder="…or just describe the change and we'll open an issue" required></textarea>
+              <button type="submit" class="btn btn-muted">Open suggestion issue →</button>
+            </form>
+          </div>
+        </details>
       </div><!-- /.community-actions -->
     </div><!-- /.community-bar -->
   </div>
@@ -98,41 +119,29 @@ layout: default
   </article>
 
   {%- comment -%}
-    Community review: per-verdict contributor lists at the bottom of the post.
-    Rendered only when marks exist. One group per verdict, driven by a single
-    spec loop (verdict|label|badge-class|symbol) so the markup lives in one
-    place. Each group is shown only if it has marks. Names are GitHub usernames
-    validated by scripts/apply_validation.py against the username regex, so
-    linking to https://github.com/<name> is safe; nameless marks read as
-    "anonymous".
+    Editor credits. Maintained by hand: whoever opens a PR against this post
+    adds their own entry to the `editors:` frontmatter block in that PR, so the
+    credit is reviewed and merged along with the change it describes. Entries
+    may be a bare GitHub username or a mapping with `name` plus optional `date`
+    and `note`.
   {%- endcomment -%}
-  {% if page.validations and page.validations.size > 0 %}
-  {% assign review_specs = "valid|Validated by|green|✓,ai-slop|Flagged AI-slop by|red|✗,needs-fixing|Needs fixing per|yellow|⚠" | split: "," %}
-  <section class="community-review">
-    <h2>Community review</h2>
-    {% for spec in review_specs %}
-      {% assign parts = spec | split: "|" %}
-      {% assign marks = page.validations | where: "verdict", parts[0] %}
-      {% if marks.size > 0 %}
-      <div class="review-group">
-        <h3 class="review-group-label">{{ parts[1] }}</h3>
-        <ul>
-          {% for v in marks %}
-          <li>
-            <span class="badge {{ parts[2] }}" aria-hidden="true">{{ parts[3] }}</span>
-            {% if v.name %}
-              <a href="https://github.com/{{ v.name | uri_escape }}" target="_blank" rel="noopener nofollow">{{ v.name | escape }}</a>
-            {% else %}
-              <span>anonymous</span>
-            {% endif %}
-            <span class="muted small">· {{ v.date | escape }}</span>
-            {% if v.note %}<div class="community-note">{{ v.note | escape }}</div>{% endif %}
-          </li>
-          {% endfor %}
-        </ul>
-      </div>
-      {% endif %}
-    {% endfor %}
+  {% if page.editors and page.editors.size > 0 %}
+  <section class="post-editors">
+    <h2>Edited by</h2>
+    <ul>
+      {% for editor in page.editors %}
+        {% if editor.name %}
+          {% assign editor_name = editor.name %}
+        {% else %}
+          {% assign editor_name = editor %}
+        {% endif %}
+        <li>
+          <a href="https://github.com/{{ editor_name | uri_escape }}" target="_blank" rel="noopener nofollow">{{ editor_name | escape }}</a>
+          {% if editor.date %}<span class="muted small">· {{ editor.date | escape }}</span>{% endif %}
+          {% if editor.note %}<div class="community-note">{{ editor.note | escape }}</div>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
   </section>
   {% endif %}
 </div>

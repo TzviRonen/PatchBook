@@ -1,0 +1,15 @@
+{
+  "name": "patchbook-votes",
+  "private": true,
+  "description": "Vote API for PatchBook — Cloudflare Worker + D1. The Worker itself has no runtime dependencies; wrangler is only a dev tool.",
+  "type": "module",
+  "scripts": {
+    "test": "node test.mjs",
+    "db:local": "wrangler d1 execute patchbook --local --env dev --file=schema.sql",
+    "dev": "wrangler dev --env dev --local",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.127.1"
+  }
+}

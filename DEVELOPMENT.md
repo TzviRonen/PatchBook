@@ -51,3 +51,25 @@ Posts land in `_posts/YYYY-MM-DD-cve-XXXX-slug.md` with Jekyll-compatible YAML f
 | `cve_id` | no | shown as blue badge |
 | `cvss` | no | color-coded badge (red ≥9, orange ≥7, yellow ≥4) |
 | `excerpt` | no | shown on homepage card |
+| `editors` | no | "Edited by" credits; added by PR authors themselves, never generated |
+
+Votes are **not** frontmatter — they live in the database behind `worker/`. See
+`ARCHITECTURE.md`.
+
+## Tests
+
+```bash
+node worker/test.mjs        # vote API: auth, one-vote-per-user, input validation
+                            # no dependencies, no network
+
+python3 serve.py 4123 &     # front-end: counts, voter popover, optimistic updates
+npm install jsdom           # point _config.yml's votes_api at http://127.0.0.1:4787 first
+node test/ui.test.mjs
+```
+
+## Vote backend
+
+`worker/` holds the Cloudflare Worker and D1 schema — deploy steps are in
+`worker/README.md`. `_config.yml`'s `votes_api` points the site at it; blank
+disables the vote UI, which is what you want if you're running the preview
+server without a Worker.
