@@ -210,8 +210,16 @@ window.PatchBook = (function () {
     var root = bar(button);
     var verdict = button.closest(".vote-group").dataset.verdict;
 
+    // If the page loaded while the API was unreachable, don't refuse outright —
+    // the failure may have been transient, and forcing a reload to recover from
+    // one bad request would be worse than the dead-end this guard replaced.
+    // Retry once, and carry on if the API is back.
     if (root.dataset.offline) {
-      setStatus(root, "Voting is unavailable right now — try reloading", true);
+      setStatus(root, "Retrying…");
+      fetchVotes(root).then(function (state) {
+        if (state && !root.dataset.offline) vote(button);
+        else setStatus(root, "Voting is unavailable right now", true);
+      });
       return false;
     }
 

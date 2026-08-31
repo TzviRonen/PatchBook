@@ -177,10 +177,31 @@ async function handleLogin(request, env) {
 // hitting them can do nothing about it. Say plainly what broke instead of
 // returning a bare status. GitHub's own error codes are safe to echo — they
 // describe the app registration, never a credential.
+// Some of what lands here is echoed from the query string, i.e. attacker
+// controlled: anyone can link a victim to /auth/callback?error=<anything>. It's
+// served as text/plain with nosniff so it can never be interpreted as markup,
+// and control characters and length are capped so the output can't be forged
+// into something that reads like a different page.
+function safeText(value, max = 300) {
+  return String(value || "")
+    .replace(/[\u0000-\u001f\u007f]+/g, " ")   // control chars, including CR/LF
+    .trim()
+    .slice(0, max);
+}
+
 function oauthError(summary, detail) {
   return new Response(
     `PatchBook sign-in failed.\n\n${summary}\n\n${detail || ""}\n`,
-    { status: 502, headers: { "Content-Type": "text/plain; charset=utf-8" } }
+    {
+      status: 502,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "no-store",
+        // A failed sign-in page has no business being framed.
+        "X-Frame-Options": "DENY",
+      },
+    }
   );
 }
 
@@ -192,8 +213,8 @@ async function handleCallback(request, env) {
   const ghError = url.searchParams.get("error");
   if (ghError) {
     return oauthError(
-      `GitHub declined the sign-in: ${ghError}`,
-      url.searchParams.get("error_description") || ""
+      `GitHub declined the sign-in: ${safeText(ghError, 80)}`,
+      safeText(url.searchParams.get("error_description"))
     );
   }
 
@@ -218,8 +239,8 @@ async function handleCallback(request, env) {
     // The single most common cause is a callback URL on the OAuth app that
     // doesn't match what we just sent, so name the exact value we sent.
     return oauthError(
-      `GitHub rejected the code exchange: ${tokenBody.error || "unknown error"}`,
-      (tokenBody.error_description || "") +
+      `GitHub rejected the code exchange: ${safeText(tokenBody.error, 80) || "unknown error"}`,
+      safeText(tokenBody.error_description) +
         `\n\nWe sent redirect_uri=${url.origin}/auth/callback` +
         `\nThat must match the OAuth app's registered callback URL exactly` +
         ` (host and port included — localhost and 127.0.0.1 are different).`

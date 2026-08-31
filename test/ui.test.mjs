@@ -142,6 +142,30 @@ check("clicking outside closes it", !group.classList.contains("is-open"));
   dw.document.querySelector('.vote-group[data-verdict="valid"] .vote-btn').click();
   await settle();
   check("click does not redirect to a dead login endpoint", !navigated2);
+  check("a click while offline retries rather than refusing outright",
+        /retrying|unavailable/i.test(dw.document.querySelector(".vote-status").textContent),
+        dw.document.querySelector(".vote-status").textContent);
+}
+
+// A transient failure at load must not lock the reader out: once the API is
+// reachable again, the next click should proceed instead of demanding a reload.
+{
+  let fail = true;                       // first fetch fails, later ones succeed
+  const dom = new JSDOM(html.replace(/<script src=[^>]*><\/script>/, ""),
+    { url: PAGE, runScripts: "dangerously", pretendToBeVisual: true });
+  const dw = dom.window;
+  dw.fetch = (u, o) => (fail ? Promise.reject(new TypeError("boom")) : fetch(String(u), o));
+  dw.eval(JS);
+  await settle();
+  check("offline after a failed load", dw.document.querySelector(".community-bar").dataset.offline === "1");
+  fail = false;                          // API comes back
+  let navigated3 = false;
+  dw._virtualConsole.on("jsdomError", e => { if (/navigation/i.test(e.message)) navigated3 = true; });
+  dw.document.querySelector('.vote-group[data-verdict="valid"] .vote-btn').click();
+  await settle(); await settle();
+  check("recovers without a reload once the API is back",
+        !dw.document.querySelector(".community-bar").dataset.offline && navigated3,
+        "offline=" + dw.document.querySelector(".community-bar").dataset.offline + " navigated=" + navigated3);
 }
 
 // ── edit flow still points at GitHub ────────────────────────────────────

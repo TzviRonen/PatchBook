@@ -205,6 +205,22 @@ r = await call("/auth/callback?error=access_denied&error_description=The+user+ha
 text = await r.text();
 check("cancelled consent is reported", /access_denied/.test(text), text.slice(0, 80));
 
+// The error page reflects query params, so anyone can aim a victim at it.
+// It must never be able to become markup or forge extra lines.
+r = await call("/auth/callback?error=" + encodeURIComponent("<script>alert(1)</script>") +
+  "&error_description=" + encodeURIComponent("line1\r\nline2\u0000nul"));
+text = await r.text();
+check("error page is text/plain", (r.headers.get("Content-Type")||"").startsWith("text/plain"),
+  r.headers.get("Content-Type"));
+check("error page sets nosniff", r.headers.get("X-Content-Type-Options") === "nosniff");
+check("error page refuses framing", r.headers.get("X-Frame-Options") === "DENY");
+check("reflected CR/LF and NUL are stripped",
+  !/[\r\n]line2/.test(text) && !text.includes("\u0000"), JSON.stringify(text.slice(0,120)));
+
+r = await call("/auth/callback?error=x&error_description=" + "A".repeat(5000));
+text = await r.text();
+check("reflected text is length-capped", text.length < 800, text.length);
+
 gh.close();
 console.log(failures ? `\n${failures} FAILED` : "\nall passed");
 process.exit(failures ? 1 : 0);

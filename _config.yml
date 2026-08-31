@@ -37,3 +37,4 @@ exclude:
   - setup.sh
   - serve.sh
   - worker
+  - test
