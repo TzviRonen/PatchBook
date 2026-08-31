@@ -14,7 +14,7 @@ The two renderers read the same `_posts/*.md` files and apply the same CSS (`ass
 The whole stack — vote Worker plus site, wired together — in one command:
 
 ```bash
-./scripts/start_dev.sh            # Flask preview  → :4123, vote API → :3003
+./scripts/start_dev.sh            # Flask preview  → :3004, vote API → :3003
 ./scripts/start_dev.sh --jekyll   # the real production renderer instead
 ```
 
@@ -68,7 +68,7 @@ Votes are **not** frontmatter — they live in the database behind `worker/`. Se
 node worker/test.mjs        # vote API: auth, one-vote-per-user, input validation
                             # no dependencies, no network
 
-python3 serve.py 4123 &     # front-end: counts, voter popover, optimistic updates
+python3 serve.py 3004 &     # front-end: counts, voter popover, optimistic updates
 npm install jsdom           # point _config.yml's votes_api at http://127.0.0.1:4787 first
 node test/ui.test.mjs
 ```

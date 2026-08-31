@@ -1,11 +1,12 @@
 /* Front-end tests for the vote UI, run against the real rendered page.
  *
- *   python3 serve.py 4123 &        # the preview server (see DEVELOPMENT.md)
+ *   python3 serve.py 3004 &        # the preview server (see DEVELOPMENT.md)
  *   npm install jsdom
  *   node test/ui.test.mjs
  *
  * The vote API is stubbed below, so no Worker, D1, or network access is needed.
- * `_config.yml`'s votes_api must point at http://127.0.0.1:4787 for this run.
+ * The page's data-api is rewritten to the stub, so this works whatever
+ * `_config.yml`'s votes_api is set to — including while start_dev.sh runs.
  *
  * The API itself is covered separately, with no dependencies at all, by
  * worker/test.mjs.
@@ -36,9 +37,14 @@ http.createServer((req,res)=>{
 }).listen(4787);
 
 
-const PAGE = "http://127.0.0.1:4123/posts/2026-08-29-cve-2026-33827-tcpip-remote-code-execution";
+const PAGE = "http://127.0.0.1:3004/posts/2026-08-29-cve-2026-33827-tcpip-remote-code-execution";
 const JS = fs.readFileSync(new URL("../assets/patchbook.js", import.meta.url), "utf8");
-const html = await (await fetch(PAGE)).text();
+
+// Point the page at the stub above regardless of what `votes_api` in
+// _config.yml happens to be — otherwise this suite breaks whenever the preview
+// server is running against a real Worker (e.g. under scripts/start_dev.sh).
+const html = (await (await fetch(PAGE)).text())
+  .replace(/data-api="[^"]*"/, 'data-api="http://127.0.0.1:4787"');
 
 let failures = 0;
 const check = (n, c, e = "") => { console.log((c?"PASS  ":"FAIL  ")+n+(c?"":"  "+e)); if(!c) failures++; };

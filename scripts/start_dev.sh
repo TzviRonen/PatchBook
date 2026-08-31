@@ -6,7 +6,7 @@
 #   ./scripts/start_dev.sh            # Flask preview (no Ruby needed)
 #   ./scripts/start_dev.sh --jekyll   # the real production renderer
 #
-#   WORKER_PORT=3003 SITE_PORT=4123 ./scripts/start_dev.sh
+#   WORKER_PORT=3003 SITE_PORT=3004 ./scripts/start_dev.sh
 #
 # While running, `votes_api` in _config.yml is pointed at the local Worker. It
 # is restored on exit — committing that line would silently break votes in
@@ -20,7 +20,7 @@ WORKER_DIR="$SITE_DIR/worker"
 CONFIG="$SITE_DIR/_config.yml"
 
 WORKER_PORT="${WORKER_PORT:-3003}"
-SITE_PORT="${SITE_PORT:-4123}"
+SITE_PORT="${SITE_PORT:-3004}"
 USE_JEKYLL=0
 [[ "${1:-}" == "--jekyll" ]] && USE_JEKYLL=1
 

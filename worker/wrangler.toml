@@ -24,7 +24,7 @@ database_id = "14dfdab5-b75e-470f-8379-ef39160fbac7"
 # of the production vars means a localhost redirect is not accepted by the live
 # Worker.
 [env.dev.vars]
-ALLOWED_ORIGINS = "https://tzvironen.github.io,http://127.0.0.1:4000,http://127.0.0.1:4123"
+ALLOWED_ORIGINS = "https://tzvironen.github.io,http://127.0.0.1:3004,http://127.0.0.1:4000"
 
 [[env.dev.d1_databases]]
 binding = "DB"
