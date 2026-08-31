@@ -121,8 +121,15 @@ SITE_PID=$!
 
 echo
 echo "[+] PatchBook dev stack up:"
-echo "      site      http://127.0.0.1:${SITE_PORT}/"
+echo "      site      http://127.0.0.1:${SITE_PORT}/  (or http://localhost:${SITE_PORT}/)"
 echo "      vote API  http://127.0.0.1:${WORKER_PORT}/"
+echo
+# GitHub matches this string exactly — host, port and path. It is the single
+# most common reason sign-in fails, and it is invisible until after consent.
+echo "    Your dev OAuth app's Authorization callback URL must be EXACTLY:"
+echo "      http://127.0.0.1:${WORKER_PORT}/auth/callback"
+echo "    (github.com/settings/developers → your dev app. Not localhost, not ${SITE_PORT}.)"
+echo
 echo "    Ctrl-C to stop both."
 echo
 

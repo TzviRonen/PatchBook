@@ -7,7 +7,8 @@
     "test": "node test.mjs",
     "db:local": "wrangler d1 execute patchbook --local --env dev --file=schema.sql",
     "dev": "wrangler dev --env dev --local --port 3003",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test:oauth": "node test_oauth.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.127.1"

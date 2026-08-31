@@ -130,6 +130,7 @@ check("foreign origin gets no CORS grant", r.headers.get("Access-Control-Allow-O
 // 11. the deployed origin allowlist itself — this is the setting that keeps
 // /auth/login from being an open redirect, so pin it against drift.
 const toml = fs.readFileSync(new URL("./wrangler.toml", import.meta.url), "utf8");
+const src  = fs.readFileSync(new URL("./src/index.js", import.meta.url), "utf8");
 const prodVars = toml.split(/^\[env\./m)[0];          // everything before [env.dev...]
 const prodOrigins = /ALLOWED_ORIGINS\s*=\s*"([^"]*)"/.exec(prodVars)[1].split(",").map(s=>s.trim());
 check("production allowlist has no wildcard", !prodOrigins.includes("*"), prodOrigins.join());
@@ -137,6 +138,14 @@ check("production allowlist has no localhost",
       !prodOrigins.some(o=>/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(o)), prodOrigins.join());
 check("production allowlist is https-only",
       prodOrigins.every(o=>o.startsWith("https://")), prodOrigins.join());
+
+// The GitHub endpoint overrides exist so test_oauth.mjs can stand a double in
+// front of the OAuth flow. If either ever appeared in deployment config, the
+// live Worker would authenticate against something other than GitHub.
+check("no GitHub endpoint override in wrangler.toml", !/GITHUB_(AUTH|API)_BASE/.test(toml));
+check("GitHub bases default to the real thing",
+      /GITHUB_AUTH_BASE \|\| "https:\/\/github\.com"/.test(src) &&
+      /GITHUB_API_BASE \|\| "https:\/\/api\.github\.com"/.test(src));
 
 console.log(failures ? `\n${failures} FAILED` : "\nall passed");
 process.exit(failures ? 1 : 0);

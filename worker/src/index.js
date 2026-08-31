@@ -22,6 +22,14 @@
  * TOKEN_SECRET. Vars (wrangler.toml): ALLOWED_ORIGINS.
  */
 
+// GitHub endpoints. Overridable *only* through deployment config (never from a
+// request) so the OAuth round trip can be exercised end to end against a test
+// double — handleCallback is otherwise unreachable without a human at a consent
+// screen. Production sets neither and gets real GitHub; worker/test.mjs asserts
+// that wrangler.toml never sets them.
+const GH_AUTH_BASE = (env) => env.GITHUB_AUTH_BASE || "https://github.com";
+const GH_API_BASE = (env) => env.GITHUB_API_BASE || "https://api.github.com";
+
 const VERDICTS = ["valid", "ai-slop"];
 const POST_RE = /^_posts\/[A-Za-z0-9._-]+\.md$/;
 const TOKEN_TTL = 60 * 60 * 24 * 30; // 30 days
@@ -155,7 +163,7 @@ async function handleLogin(request, env) {
     env.TOKEN_SECRET
   );
 
-  const gh = new URL("https://github.com/login/oauth/authorize");
+  const gh = new URL(GH_AUTH_BASE(env) + "/login/oauth/authorize");
   gh.searchParams.set("client_id", env.GITHUB_CLIENT_ID);
   gh.searchParams.set("redirect_uri", url.origin + "/auth/callback");
   // No scopes: we only need the user's public identity, so the consent screen
@@ -165,15 +173,37 @@ async function handleLogin(request, env) {
   return Response.redirect(gh.toString(), 302);
 }
 
+// OAuth failures are configuration problems ~100% of the time, and the reader
+// hitting them can do nothing about it. Say plainly what broke instead of
+// returning a bare status. GitHub's own error codes are safe to echo — they
+// describe the app registration, never a credential.
+function oauthError(summary, detail) {
+  return new Response(
+    `PatchBook sign-in failed.\n\n${summary}\n\n${detail || ""}\n`,
+    { status: 502, headers: { "Content-Type": "text/plain; charset=utf-8" } }
+  );
+}
+
 async function handleCallback(request, env) {
   const url = new URL(request.url);
+
+  // GitHub reports some failures by redirecting here rather than showing its
+  // own error page — e.g. the reader pressing "Cancel" on the consent screen.
+  const ghError = url.searchParams.get("error");
+  if (ghError) {
+    return oauthError(
+      `GitHub declined the sign-in: ${ghError}`,
+      url.searchParams.get("error_description") || ""
+    );
+  }
+
   const code = url.searchParams.get("code");
   const state = await verify(url.searchParams.get("state") || "", env.TOKEN_SECRET);
   if (!code || !state) return new Response("Bad OAuth state", { status: 400 });
   const back = safeReturnUrl(state.r, env);
   if (!back) return new Response("Bad return URL", { status: 400 });
 
-  const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+  const tokenRes = await fetch(GH_AUTH_BASE(env) + "/login/oauth/access_token", {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -184,9 +214,19 @@ async function handleCallback(request, env) {
     }),
   });
   const tokenBody = await tokenRes.json().catch(() => ({}));
-  if (!tokenBody.access_token) return new Response("OAuth exchange failed", { status: 502 });
+  if (!tokenBody.access_token) {
+    // The single most common cause is a callback URL on the OAuth app that
+    // doesn't match what we just sent, so name the exact value we sent.
+    return oauthError(
+      `GitHub rejected the code exchange: ${tokenBody.error || "unknown error"}`,
+      (tokenBody.error_description || "") +
+        `\n\nWe sent redirect_uri=${url.origin}/auth/callback` +
+        `\nThat must match the OAuth app's registered callback URL exactly` +
+        ` (host and port included — localhost and 127.0.0.1 are different).`
+    );
+  }
 
-  const userRes = await fetch("https://api.github.com/user", {
+  const userRes = await fetch(GH_API_BASE(env) + "/user", {
     headers: {
       Authorization: "Bearer " + tokenBody.access_token,
       Accept: "application/vnd.github+json",
@@ -194,7 +234,12 @@ async function handleCallback(request, env) {
     },
   });
   const user = await userRes.json().catch(() => ({}));
-  if (!user || !user.id || !user.login) return new Response("GitHub user lookup failed", { status: 502 });
+  if (!user || !user.id || !user.login) {
+    return oauthError(
+      "GitHub accepted the sign-in but the identity lookup failed.",
+      `api.github.com/user returned ${userRes.status}.`
+    );
+  }
 
   // GitHub's own access token is deliberately discarded here — we never store
   // it. All we keep is our own signed assertion of who this reader is.
