@@ -65,6 +65,9 @@ endpoint table.
   the repo is no longer the single source of truth, in exchange for votes that
   actually work. The database is the record; back it up with
   `wrangler d1 export`.
+- **Degrading is quiet.** If the Worker is unreachable the post still renders
+  normally; only the counts fail, with a status message. A click retries once
+  before giving up, so one flaky request can't lock a reader out of voting.
 
 ## Edit suggestions
 
@@ -86,10 +89,33 @@ trusted at face value.
 republishes a post (`_existing_block`), so re-running the pipeline over a CVE
 never wipes contributor credits.
 
+## Testing the parts that hide
+
+Two pieces of this design are structurally hard to test, and both were broken at
+some point *because* they were hard to test:
+
+- **The OAuth callback** cannot be reached without a human at a GitHub consent
+  screen. `GITHUB_AUTH_BASE` / `GITHUB_API_BASE` make the two GitHub endpoints
+  injectable so `worker/test_oauth.mjs` can drive the entire round trip against a
+  double — login, consent, callback, code exchange, identity lookup, session,
+  and a vote recorded under that identity. The overrides are readable only from
+  deployment config, never from a request; production sets neither, and
+  `worker/test.mjs` fails if either appears in `wrangler.toml` or if the
+  defaults stop pointing at real GitHub.
+- **The origin allowlist** is the one setting standing between `/auth/login` and
+  an open redirect that leaks session tokens, so `worker/test.mjs` pins it:
+  production must be a single HTTPS origin, with no wildcard and no localhost.
+
+Everything else is covered by `worker/test.mjs` (the API) and `test/ui.test.mjs`
+(the front end, against a stub). See `DEVELOPMENT.md`.
+
 ## Where each piece lives
 
 - `worker/src/index.js` — vote API and OAuth. Runs on Cloudflare, not GitHub.
 - `worker/schema.sql` — the vote table and its one-vote-per-user key.
+- `worker/test.mjs`, `worker/test_oauth.mjs`, `test/ui.test.mjs` — the three
+  suites; none are deployed or published.
+- `scripts/start_dev.sh` — brings the Worker and site up together for local work.
 - `assets/patchbook.js` — fetches/renders counts and the voter popover, casts
   votes, and builds the GitHub web-editor / suggestion-issue URLs.
 - `_layouts/post.html` — the vote bar, the popover markup, and the "Edited by"
@@ -122,7 +148,14 @@ never wipes contributor credits.
   can cast votes and nothing else. Recovery is rotating the secret, which
   invalidates every session at once. GitHub's own access token is discarded
   immediately after the identity lookup, so there is nothing else to steal.
-- **CORS is origin-allowlisted**, not `*`.
+- **CORS is origin-allowlisted**, not `*`. Production lists exactly one origin;
+  the preview server's `localhost` and `127.0.0.1` origins live in `[env.dev]`
+  and are never deployed.
+- **The sign-in failure page reflects URL parameters**, since anyone can link a
+  victim to `/auth/callback?error=…`. It is served `text/plain` with `nosniff`
+  and `X-Frame-Options: DENY`, and reflected values are stripped of control
+  characters and length-capped, so the output can neither become markup nor
+  forge lines that read as our own.
 - **No long-lived GitHub credentials exist.** The Worker holds an OAuth client
   secret and a token-signing secret; Pages deployment uses the built-in
   `GITHUB_TOKEN`. Nothing has write access to the repo except you merging PRs.

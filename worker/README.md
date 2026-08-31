@@ -17,18 +17,23 @@ npx wrangler login
 
 # 1. Database
 npx wrangler d1 create patchbook              # copy the id into wrangler.toml
+#    ⚠ that command suggests `binding = "patchbook"`. Keep `binding = "DB"` —
+#      the binding is the name the code sees as env.DB, not the database name.
+#      Getting this wrong makes every request 500 with Cloudflare error 1101.
+#      The id goes in TWO places: [[d1_databases]] and [[env.dev.d1_databases]].
 npx wrangler d1 execute patchbook --remote --file=schema.sql
 npx wrangler d1 execute patchbook --remote --file=seed.sql   # optional: old frontmatter marks
 
 # 2. GitHub OAuth app  (github.com/settings/developers → New OAuth App)
 #    Homepage URL:               https://tzvironen.github.io/patchbook
 #    Authorization callback URL: https://patchbook-votes.tzvironen.workers.dev/auth/callback
-npx wrangler secret put GITHUB_CLIENT_ID
-npx wrangler secret put GITHUB_CLIENT_SECRET
-npx wrangler secret put TOKEN_SECRET          # openssl rand -base64 48
+npx wrangler secret put GITHUB_CLIENT_ID --env=""
+npx wrangler secret put GITHUB_CLIENT_SECRET --env=""
+openssl rand -base64 48 | npx wrangler secret put TOKEN_SECRET --env=""
+#    ^ piping keeps the secret out of your shell history and terminal scrollback
 
-# 3. Ship
-npx wrangler deploy
+# 3. Ship  (--env="" targets the top-level, i.e. production, environment)
+npx wrangler deploy --env=""
 ```
 
 Then set `votes_api` in `../_config.yml` to the deployed Worker URL
@@ -64,6 +69,18 @@ Then set `votes_api` in `../_config.yml` to the deployed Worker URL
   make `/auth/login` an open redirect that leaks session tokens.
 - **All responses are `Cache-Control: no-store`** — stale counts would defeat
   the point.
+- **Sign-in failures explain themselves.** GitHub returns `{error,
+  error_description}` on a failed exchange and redirects to the callback with
+  `?error=` when consent is refused. Both are reported, along with the exact
+  `redirect_uri` we sent, because a mismatched callback URL is the usual cause
+  and is invisible until after consent. Those values are reflected from a URL
+  anyone can craft, so the page is `text/plain` + `nosniff` + `DENY`-framed,
+  with control characters stripped and length capped.
+- **The GitHub base URLs are injectable** (`GITHUB_AUTH_BASE`,
+  `GITHUB_API_BASE`) so `test_oauth.mjs` can drive the full round trip against a
+  double. They are readable only from deployment config, never from a request;
+  production sets neither, and `test.mjs` fails if either appears in
+  `wrangler.toml`.
 
 ## Local development
 
@@ -78,14 +95,34 @@ npm run db:local        # apply schema.sql to the local D1
 npm run dev             # → http://127.0.0.1:3003
 ```
 
-**Use `--env dev`.** The preview server's `http://127.0.0.1:…` origin is only in
-the `[env.dev]` allowlist, deliberately — production accepts redirects to
-`https://tzvironen.github.io` and nothing else, and `test.mjs` fails the build if
-a localhost or wildcard origin ever appears in the production vars.
+Easier still, from the site root: `../scripts/start_dev.sh` brings up this
+Worker and the site together and wires `votes_api` between them.
 
-`npm run dev` serves on `http://127.0.0.1:3003`; point `votes_api` at it and
-run the site with `../serve.sh`. You'll need a second OAuth app whose callback
-URL is the local Worker, since GitHub matches the callback host exactly.
+Three things about `npm run dev` are load-bearing, and all three are already in
+the script:
 
-Front-end behaviour (counts, popover, optimistic updates) can be tested without
-any of this — see `../test/ui.test.mjs`, which stubs the API entirely.
+- **`--env dev`.** The preview server's `127.0.0.1` / `localhost` origins are
+  only in the `[env.dev]` allowlist, deliberately. Production accepts redirects
+  to `https://tzvironen.github.io` and nothing else, and `test.mjs` fails if a
+  localhost, wildcard, or non-HTTPS origin ever reaches the production vars.
+- **`--ip 0.0.0.0`.** `wrangler dev` binds loopback by default, and this repo's
+  `container.sh` publishes ports with `docker run -p`, which cannot reach a
+  loopback-bound socket inside the container. The site would load while every
+  vote failed — and `curl` from inside the container would show the API perfectly
+  healthy the whole time.
+- **`--local`.** Keeps writes in `.wrangler/`. Without it you would be voting
+  against the production database.
+
+A second OAuth app is needed to test sign-in locally, with callback
+`http://127.0.0.1:3003/auth/callback` — GitHub matches host and port exactly.
+See `../DEVELOPMENT.md`.
+
+## Tests
+
+```bash
+npm test              # 23 cases — no dependencies, no network
+npm run test:oauth    # 25 cases — full OAuth round trip against a GitHub double
+```
+
+Front-end behaviour (counts, popover, optimistic updates, offline recovery) is
+covered separately by `../test/ui.test.mjs`, which stubs this API entirely.

@@ -72,8 +72,12 @@ you already hold retracts it.
 only ever in the popover — never in the post body.
 
 Votes live in the D1 database behind the Cloudflare Worker in `worker/`, not in
-this repo. `_config.yml`'s `votes_api` points the site at it; leave it blank to
-turn the vote UI off.
+this repo. `_config.yml`'s `votes_api` points the site at it — currently
+`https://patchbook-votes.tzvironen.workers.dev` — and leaving it blank turns the
+vote UI off entirely.
+
+If the Worker is unreachable the post still renders normally; only the counts
+fail, and a click retries once before reporting it.
 
 ### Edit suggestions — via pull request, visible only once merged
 
@@ -100,6 +104,15 @@ never wipes contributor credits.
 
 **Repo setup note:** create the `suggestion` label in the GitHub repo — GitHub
 silently drops the `labels=` URL param for labels that don't exist.
+
+## Local development
+
+```bash
+./scripts/start_dev.sh        # site on :3004, vote API on :3003
+```
+
+Brings up both halves and wires them together, restoring `_config.yml` on exit.
+Tests, the dev OAuth app, and a troubleshooting list live in `DEVELOPMENT.md`.
 
 ## Deploy (GitHub Pages)
 
