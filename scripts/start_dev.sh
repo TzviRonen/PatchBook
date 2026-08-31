@@ -84,8 +84,13 @@ fi
 
 # ── vote API ─────────────────────────────────────────────────────────────────
 
+# --ip 0.0.0.0 is load-bearing in a container. wrangler binds 127.0.0.1 by
+# default, and this repo's container.sh publishes ports with `docker run -p`,
+# which cannot reach a loopback-bound service inside the container. The site
+# would load (serve.py binds 0.0.0.0) while every vote request from the host
+# browser failed — with the API perfectly reachable from inside via curl.
 echo "[*] Starting the vote Worker on port $WORKER_PORT…"
-(cd "$WORKER_DIR" && npx wrangler dev --env dev --local --port "$WORKER_PORT" >/dev/null 2>&1) &
+(cd "$WORKER_DIR" && npx wrangler dev --env dev --local --port "$WORKER_PORT" --ip 0.0.0.0 >/dev/null 2>&1) &
 WORKER_PID=$!
 
 for _ in $(seq 1 40); do
@@ -99,6 +104,37 @@ if ! curl -fsS -m 2 "http://127.0.0.1:${WORKER_PORT}/api/me" >/dev/null 2>&1; th
   exit 1
 fi
 echo "[+] Vote API ready  →  http://127.0.0.1:${WORKER_PORT}"
+
+# curl from inside the container succeeds even when the browser on the host
+# cannot connect, so confirm the socket is not loopback-only. This exact
+# asymmetry made the API look healthy while every vote failed.
+if ! python3 - "$WORKER_PORT" <<'PYEOF'
+import struct, sys
+want = int(sys.argv[1])
+for path, v6 in (("/proc/net/tcp", False), ("/proc/net/tcp6", True)):
+    try:
+        rows = open(path).read().splitlines()[1:]
+    except OSError:
+        continue
+    for row in rows:
+        f = row.split()
+        addr, port = f[1].split(":")
+        if int(port, 16) != want or f[3] != "0A":
+            continue
+        if v6:
+            if int(addr, 16) == 1:      # ::1
+                continue
+        elif ".".join(str(b) for b in struct.pack("<I", int(addr, 16))) == "127.0.0.1":
+            continue
+        sys.exit(0)                     # reachable from outside loopback
+sys.exit(1)
+PYEOF
+then
+  echo "[!] The Worker is listening on loopback only."
+  echo "    Inside this container that is invisible to curl but fatal to the"
+  echo "    browser on your host: container.sh publishes ports with 'docker -p',"
+  echo "    which cannot reach a loopback-bound socket. Pass --ip 0.0.0.0."
+fi
 
 # ── point the site at it ─────────────────────────────────────────────────────
 
