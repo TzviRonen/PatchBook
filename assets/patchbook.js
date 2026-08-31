@@ -162,12 +162,24 @@ window.PatchBook = (function () {
         render(root, state);
         return state;
       })
-      .catch(function () {
+      .catch(function (err) {
         // Remember this so a click doesn't navigate to an unreachable login
         // endpoint, which surfaces as a browser "can't reach this page" with
         // nothing pointing at the real cause.
         root.dataset.offline = "1";
         setStatus(root, "Vote counts unavailable", true);
+        // fetch() cannot tell a CORS rejection from a dead host — both arrive
+        // here as an opaque TypeError — so name both possibilities and print
+        // the origin, which is the usual culprit (localhost vs 127.0.0.1 are
+        // different origins and must both be in the Worker's allowlist).
+        if (window.console) {
+          console.warn(
+            "PatchBook: vote API unreachable at " + api(root) +
+              " — host down, or this origin (" + window.location.origin +
+              ") is not in the Worker's ALLOWED_ORIGINS.",
+            err
+          );
+        }
       });
   }
 
