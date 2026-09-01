@@ -128,12 +128,6 @@ BASE = """<!DOCTYPE html>
   </div>
 </nav>
 {% block body %}{% endblock %}
-<footer>
-  <div class="footer-inner">
-    <span>PatchBook — Windows kernel CVE analysis</span>
-    <span>AI-drafted, community-corrected</span>
-  </div>
-</footer>
 </body>
 </html>"""
 

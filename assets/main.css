@@ -103,27 +103,6 @@ nav {
 .nav-links a:hover { color: var(--text); }
 .nav-links a.active { color: var(--text); border-bottom-color: var(--blue); }
 
-/* ── footer ── */
-footer {
-  margin-top: auto;
-  border-top: 1px solid var(--border);
-  background: var(--bg);
-  padding: 1.25rem 2rem;
-}
-.footer-inner {
-  max-width: 860px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.85rem;
-  color: var(--muted);
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-.footer-inner a { color: var(--blue); text-decoration: none; }
-.footer-inner a:hover { text-decoration: underline; }
-
 /* ── badges ── */
 .badge {
   display: inline-flex; align-items: center;
@@ -599,7 +578,6 @@ footer {
   nav { padding: 0 1rem; }
   .page { padding: 1.5rem 1rem; }
   .report-title { font-size: 1.4rem; }
-  .footer-inner { flex-direction: column; text-align: center; }
 }
 
 /* ── category chooser ── */
