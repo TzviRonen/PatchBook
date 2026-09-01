@@ -152,5 +152,60 @@ ok("tooltip leads with the value", /^CVSS /.test($(".chart-tip-value").textConte
   ok("grid is a hairline set, not per-point", svg.querySelectorAll(".chart-grid").length === 5);
 }
 
+
+// ── round trip: a file the Publish form generated must actually render ────
+// The generator is unit-tested in publish.test.mjs, but only this proves its
+// output survives serve.py's hand-rolled frontmatter parser and both H1
+// strippers. A quote or newline in the wrong place shows up here and nowhere
+// else.
+{
+  const vm = await import("node:vm");
+  const g = {
+    console, navigator: {},
+    document: { readyState: "complete", addEventListener() {}, querySelector: () => null, querySelectorAll: () => [] },
+    location: { hash: "", pathname: "/", search: "", href: "http://localhost/" },
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    history: { replaceState() {} },
+  };
+  g.window = g;
+  vm.createContext(g);
+  vm.runInContext(JS, g);
+  const P = g.window.PatchBookPublish;
+
+  const values = {
+    cve: "CVE-2026-77777", date: "2026-05-05", cvss: "9.3",
+    title: 'Pool overflow in "afd.sys": a *nasty* one',
+    binary: "afd.sys", kb: "KB5099999",
+    excerpt: "first line\nsecond line", body: "",
+  };
+  const name = P.filenameFor(values).replace(/^_reports\//, "");
+  const file = path.join(REPORTS, name);
+  fs.writeFileSync(file, P.fileFor(values));
+  written.push(file);
+
+  const slug = name.replace(/\.md$/, "");
+  const res = await fetch(`${SITE}/reports/${slug}`);
+  const page = await res.text();
+  ok("generated report renders", res.status === 200, res.status);
+
+  // Two legitimate occurrences: <title> and the styled header. A third means
+  // the body's H1 was not stripped — both renderers are brittle about that,
+  // and this is what catches it.
+  const titles = (page.match(/Pool overflow in/g) || []).length;
+  ok("generated report's title is not duplicated", titles === 2, titles + " occurrences");
+  ok("no stray H1 survives in the article", !/<article[^>]*>[\s\S]*?<h1/.test(page));
+
+  // Double quotes are deliberately downgraded to single ones: serve.py does
+  // `.strip('"')` with no escape handling, so a double quote cannot survive
+  // inside a quoted value.
+  ok("quotes were downgraded, not mangled", /Pool overflow in &#39;afd\.sys&#39;/.test(page), "title mangled");
+  ok("severity badge picked the right band", /badge red/.test(page));
+  ok("metadata bullets rendered", /Affected binary/.test(page));
+
+  const list = await (await fetch(`${SITE}/windows/`)).text();
+  ok("generated report appears in the Windows list",
+     list.includes(`data-date="2026-05-05"`) && list.includes(`data-cvss="9.3"`));
+}
+
 console.log(bad ? `\n${bad} FAILED` : "\nall passed");
 process.exit(bad ? 1 : 0);

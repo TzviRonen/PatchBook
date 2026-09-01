@@ -717,3 +717,311 @@ window.PatchBookReports = (function () {
 
   return { init: init };
 })();
+
+/* PatchBook — the Publish form.
+ *
+ * Turns the form into a correctly-shaped _reports/*.md file, copies it to the
+ * clipboard and opens GitHub's new-file editor, which forks and opens a pull
+ * request. Nothing is written server-side.
+ *
+ * Why clipboard rather than prefilling the file into the URL: GitHub's
+ * ?value= caps out hard — measured 500 at ~7,000 URL chars and 414 at ~8,200,
+ * while a real report percent-encodes to ~21,000. Only ?filename= is sent.
+ */
+window.PatchBookPublish = (function () {
+  // Must match REPORT_RE in worker/src/index.js. A filename outside this set
+  // makes every vote on the merged report 400, so it is checked before submit.
+  var REPORT_RE = /^_reports\/[A-Za-z0-9._-]+\.md$/;
+  var CVE_RE = /^CVE-\d{4}-\d{4,7}$/i;
+  var EXCERPT_MAX = 300;
+
+  var SKELETON = [
+    "## TL;DR",
+    "",
+    "One paragraph: what the bug is, who can reach it, and what it gets them.",
+    "",
+    "## Background",
+    "",
+    "The subsystem and the objects involved.",
+    "",
+    "## Root Cause",
+    "",
+    "What the pre-patch code got wrong.",
+    "",
+    "## The Patch",
+    "",
+    "What changed, with the decompiled before/after.",
+    "",
+    "## Exploitability",
+    "",
+    "The primitive this yields, and what it takes to reach it.",
+    "",
+  ].join("\n");
+
+  /* ── sanitising ─────────────────────────────────────────────────────── */
+
+  // serve.py's frontmatter parser is line-oriented with no escape handling, so
+  // every value has to survive as a single plain line. See serve.py:24-46.
+  function oneLine(value) {
+    return String(value || "").replace(/[\r\n\t]+/g, " ").replace(/ {2,}/g, " ").trim();
+  }
+
+  // The parser does `.strip('"')` and nothing else: it would eat the reader's
+  // own leading/trailing quotes, and has no way to represent an inner one. So
+  // strip the outer pair and downgrade inner quotes, exactly as
+  // publish_to_patchbook.py does.
+  function yamlString(value) {
+    return '"' + oneLine(value).replace(/^"+|"+$/g, "").replace(/"/g, "'") + '"';
+  }
+
+  // Markdown-active characters are escaped in the H1 only — the frontmatter
+  // copy is a plain string and must stay readable.
+  function escapeMarkdown(value) {
+    return oneLine(value).replace(/([\\`*_\[\]])/g, "\\$1");
+  }
+
+  function slugify(title, cve) {
+    var base = oneLine(title)
+      // Drop a "CVE-…:" prefix if the author typed one; it is already in the
+      // filename and would repeat.
+      .replace(/^\s*CVE-\d{4}-\d+\s*[:\-–]\s*/i, "");
+    if (base.normalize) base = base.normalize("NFKD");
+    var slug = base
+      .replace(/[\u0300-\u036f]/g, "") // combining marks left by NFKD
+      .replace(/[^\x20-\x7e]/g, "")      // REPORT_RE allows ASCII only
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/-{2,}/g, "-")
+      .replace(/^-+|-+$/g, "");
+    if (slug.length > 60) {
+      slug = slug.slice(0, 60);
+      var cut = slug.lastIndexOf("-");
+      if (cut > 20) slug = slug.slice(0, cut);
+      slug = slug.replace(/-+$/, "");
+    }
+    // A title of only punctuation or non-Latin script leaves nothing usable.
+    if (!slug || /^\.+$/.test(slug)) slug = "report";
+    return slug;
+  }
+
+  function severityClass(cvss) {
+    var v = parseFloat(cvss);
+    if (isNaN(v)) return "muted";
+    if (v >= 9) return "red";
+    if (v >= 7) return "orange";
+    if (v >= 4) return "yellow";
+    return "muted";
+  }
+
+  function severityLabel(cvss) {
+    var v = parseFloat(cvss);
+    if (isNaN(v)) return "—";
+    if (v >= 9) return v.toFixed(1) + " · Critical";
+    if (v >= 7) return v.toFixed(1) + " · High";
+    if (v >= 4) return v.toFixed(1) + " · Medium";
+    return v.toFixed(1) + " · Low";
+  }
+
+  /* ── generation ─────────────────────────────────────────────────────── */
+
+  function read(form) {
+    // form.elements, never form.<name> — the latter collides with built-in
+    // HTMLFormElement properties.
+    var get = function (key) {
+      var el = form.elements[key];
+      return el && el.value ? el.value : "";
+    };
+    return {
+      cve: get("cve_id").trim().toUpperCase(),
+      date: get("date").trim(),
+      cvss: get("cvss").trim(),
+      title: get("title"),
+      binary: get("binary").trim(),
+      kb: get("kb").trim(),
+      excerpt: get("excerpt"),
+      body: get("body"),
+    };
+  }
+
+  function filenameFor(values) {
+    return (
+      "_reports/" + values.date + "-" + values.cve.toLowerCase() + "-" +
+      slugify(values.title, values.cve) + ".md"
+    );
+  }
+
+  function fileFor(values) {
+    var title = oneLine(values.title);
+    var cvss = parseFloat(values.cvss);
+    var lines = [
+      "---",
+      "layout: report",
+      "title: " + yamlString(title),
+      "date: " + values.date,
+      "cve_id: " + values.cve,
+      "cvss: " + (isNaN(cvss) ? "" : cvss.toFixed(1)),
+    ];
+    var excerpt = oneLine(values.excerpt).slice(0, EXCERPT_MAX);
+    if (excerpt) lines.push("excerpt: " + yamlString(excerpt));
+    lines.push("---", "");
+
+    // The H1 must be the very first thing in the body and carry a space after
+    // the hash: _layouts/report.html only strips when the rendered body starts
+    // with <h1, and serve.py's regex requires `# ` followed by a non-hash.
+    // Miss either and the title renders twice.
+    lines.push("# " + values.cve + ": " + escapeMarkdown(title), "");
+
+    lines.push("- **Affected binary:** `" + (values.binary || "unknown") + "`");
+    lines.push("- **CVE:** " + values.cve);
+    if (!isNaN(cvss)) lines.push("- **CVSS:** " + cvss.toFixed(1));
+    if (values.kb) lines.push("- **Patch KB:** " + values.kb);
+    lines.push("");
+
+    // Blank-line-separated paragraphs only: serve.py enables markdown nl2br
+    // and kramdown does not, so a single newline renders differently in
+    // preview and in production.
+    lines.push(String(values.body || SKELETON).replace(/\r\n/g, "\n").trim(), "");
+    return lines.join("\n");
+  }
+
+  function validate(values) {
+    if (!CVE_RE.test(values.cve)) return "CVE number must look like CVE-2026-33827.";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(values.date)) return "Pick a release date.";
+    var cvss = parseFloat(values.cvss);
+    if (isNaN(cvss) || cvss < 0 || cvss > 10) return "Severity must be a CVSS score between 0 and 10.";
+    if (!oneLine(values.title)) return "Give the report a title.";
+    var name = filenameFor(values);
+    // Belt and braces: the slug rules should guarantee this, but a filename
+    // that slips through breaks voting on the report once it is merged.
+    if (!REPORT_RE.test(name)) return "That title can't be turned into a valid filename — try plainer wording.";
+    return null;
+  }
+
+  /* ── UI ─────────────────────────────────────────────────────────────── */
+
+  function newFileUrl(root, filename) {
+    var repo = root.dataset.repo;
+    var branch = root.dataset.branch || "main";
+    // filename only — never `value`. See the note at the top of this module.
+    return "https://github.com/" + repo + "/new/" + branch +
+      "?filename=" + encodeURIComponent(filename);
+  }
+
+  function showError(root, message) {
+    var el = root.querySelector("[data-publish-error]");
+    if (!el) return;
+    el.textContent = message || "";
+    el.hidden = !message;
+  }
+
+  function submit(form) {
+    var root = form.closest(".community");
+    var values = read(form);
+
+    var problem = validate(values);
+    if (problem) {
+      showError(root, problem);
+      // Point at the offending control rather than making them hunt.
+      var first = form.querySelector(":invalid") || form.elements.cve_id;
+      if (first && first.focus) first.focus();
+      return false;
+    }
+    showError(root, "");
+
+    var filename = filenameFor(values);
+    var file = fileFor(values);
+
+    var output = root.querySelector("[data-publish-output]");
+    var status = root.querySelector("[data-publish-status]");
+    var area = root.querySelector("[data-publish-file]");
+    var open = root.querySelector("[data-publish-open]");
+    var download = root.querySelector("[data-publish-download]");
+    var button = root.querySelector("[data-publish-submit]");
+
+    // The panel is populated before the clipboard is even attempted, so the
+    // reader's work is recoverable no matter what happens next.
+    area.value = file;
+    open.href = newFileUrl(root, filename);
+    download.href = URL.createObjectURL(new Blob([file], { type: "text/markdown" }));
+    download.setAttribute("download", filename.replace(/^_reports\//, ""));
+    output.hidden = false;
+    button.textContent = "Regenerate & copy again";
+
+    function copied() {
+      status.textContent = "Copied. Paste it into the GitHub editor that just opened, then press “Propose new file”.";
+      window.open(open.href, "_blank", "noopener");
+    }
+    function manual() {
+      // Insecure context, denied permission, or no API at all. The file is
+      // already on screen; select it and tell them to copy it themselves.
+      status.textContent = "Couldn't reach the clipboard — select the text below and copy it, then open the editor.";
+      area.focus();
+      area.select();
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(file).then(copied, manual);
+    } else {
+      manual();
+    }
+
+    output.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    return false;
+  }
+
+  function init() {
+    var root = document.querySelector(".publish-page");
+    if (!root) return;
+    var form = root.querySelector(".publish-form");
+    if (!form) return;
+
+    if (form.elements.body && !form.elements.body.value) {
+      form.elements.body.value = SKELETON;
+    }
+
+    var badge = root.querySelector("[data-cvss-preview]");
+    var nameOut = root.querySelector("[data-publish-filename]");
+
+    function refresh() {
+      var values = read(form);
+      if (badge) {
+        badge.textContent = severityLabel(values.cvss);
+        badge.className = "badge " + severityClass(values.cvss) + " severity-badge";
+      }
+      // Showing the filename as they type makes the slug rules visible rather
+      // than a surprise at submit.
+      if (nameOut) {
+        nameOut.textContent = values.cve && values.date && values.title
+          ? filenameFor(values)
+          : "";
+      }
+    }
+
+    form.addEventListener("input", refresh);
+    var cve = form.elements.cve_id;
+    if (cve) cve.addEventListener("blur", function () { cve.value = cve.value.trim().toUpperCase(); refresh(); });
+    refresh();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+
+  return {
+    // exported for the tests, which exercise the rules directly
+    slugify: slugify,
+    filenameFor: filenameFor,
+    fileFor: fileFor,
+    validate: validate,
+    severityClass: severityClass,
+    severityLabel: severityLabel,
+    read: read,
+    newFileUrl: newFileUrl,
+    submit: submit,
+    init: init,
+    SKELETON: SKELETON,
+    REPORT_RE: REPORT_RE,
+  };
+})();

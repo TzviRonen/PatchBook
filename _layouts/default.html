@@ -21,8 +21,15 @@
     PatchBook
   </a>
   <div class="nav-links">
-    <a href="{{ '/' | relative_url }}"{% if page.url == '/' %} class="active"{% endif %}>Reports</a>
-    <a href="{{ '/about' | relative_url }}"{% if page.url == '/about/' %} class="active"{% endif %}>About</a>
+    {%- comment -%}
+      Match on a prefix, not equality: a page's url is `/about.html`, not
+      `/about/`, so the old equality test never fired and no tab was ever
+      highlighted. `/windows/` and a report page both belong under Reports.
+    {%- endcomment -%}
+    {%- assign u = page.url -%}
+    <a href="{{ '/' | relative_url }}"{% if u == '/' or u contains '/windows' or u contains '/reports/' %} class="active"{% endif %}>Reports</a>
+    <a href="{{ '/publish' | relative_url }}"{% if u contains '/publish' %} class="active"{% endif %}>Publish</a>
+    <a href="{{ '/about' | relative_url }}"{% if u contains '/about' %} class="active"{% endif %}>About</a>
   </div>
 </nav>
 {{ content }}

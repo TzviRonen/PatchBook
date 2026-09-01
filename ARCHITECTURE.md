@@ -68,6 +68,18 @@ endpoint table.
   normally; only the counts fail, with a status message. A click retries once
   before giving up, so one flaky request can't lock a reader out of voting.
 
+## New reports
+
+`/publish` (`publish.md` + `assets/patchbook.js`) generates a `_reports/*.md`
+file from a form, copies it to the clipboard and opens GitHub's new-file editor
+— fork and pull request, the same review gate as an edit. Nothing is written
+server-side and no scope is added.
+
+GitHub's `?value=` prefill cannot carry a report (500 at ~7,000 URL chars, 414
+past 8,200; a real report encodes to ~21,000), so only the filename is passed
+and the content travels via the clipboard, with an always-visible textarea and
+a download link as the fallback.
+
 ## Edit suggestions
 
 Entirely GitHub's:
@@ -114,8 +126,8 @@ against fixture reports it writes and removes itself). See `DEVELOPMENT.md`.
 - `worker/src/index.js` — vote API and OAuth. Runs on Cloudflare, not GitHub.
 - `worker/schema.sql` — the vote table and its one-vote-per-user key.
 - `worker/test.mjs`, `worker/test_oauth.mjs`, `test/ui.test.mjs`,
-  `test/reports.test.mjs`, `test/browser.test.mjs` — the five suites; none are
-  deployed or published.
+  `test/reports.test.mjs`, `test/publish.test.mjs`, `test/browser.test.mjs` —
+  the six suites; none are deployed or published.
 - `scripts/start_dev.sh` — brings the Worker and site up together for local work.
 - `assets/patchbook.js` — fetches/renders counts and the voter popover, casts
   votes, and builds the GitHub web-editor / suggestion-issue URLs.

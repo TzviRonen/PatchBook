@@ -64,7 +64,7 @@ Votes are **not** frontmatter — they live in the database behind `worker/`. Se
 
 ## Tests
 
-Five suites. The first two need nothing installed and no network:
+Six suites. The first three need nothing installed and no network:
 
 ```bash
 node worker/test.mjs         # 23 — auth, one-vote-per-user, input validation,
@@ -78,14 +78,20 @@ npm install jsdom            #      offline recovery. Rewrites the page's
 node test/ui.test.mjs        #      data-api to its own stub, so it does not
                              #      care what votes_api is set to.
 
-node test/reports.test.mjs   # 34 — date filter, range slider, severity plot.
+node test/publish.test.mjs   # 49 — the Publish form's generator: filenames,
+                             #      REPORT_RE conformance, frontmatter
+                             #      sanitising, validation. Pure, no server.
+
+node test/reports.test.mjs   # 41 — date filter, range slider, severity plot,
+                             #      and a round trip proving a generated report
+                             #      survives both renderers.
                              #      Writes fixture reports into _reports/ for
                              #      the run and removes them on exit, so the
                              #      filter is exercised with real spread.
 
 npx playwright install --with-deps chromium
-npm install playwright       # 13 — layout and pointer behaviour in a real
-node test/browser.test.mjs   #      browser. Optional, but see below.
+npm install playwright       # 31 — layout, pointer behaviour and the clipboard
+node test/browser.test.mjs   #      in a real browser. Optional, but see below.
 ```
 
 **Run the browser suite before shipping anything visual.** jsdom does no layout
@@ -95,6 +101,10 @@ that stayed on screen after being filtered out (a class `display` rule outranks
 the user agent's `[hidden]`), and a template that never loaded its own script.
 Every other suite was green through all three.
 
+The clipboard belongs there too: `navigator.clipboard` does not exist in jsdom,
+and the Publish form's whole handover depends on it — including the denied path,
+which is the entire flow for anyone browsing over plain http.
+
 Note `serve.py` reads `assets/main.css` **once at import** — restart it after a
 stylesheet change or you will be testing the old CSS.
 
@@ -103,6 +113,26 @@ without a human at a consent screen — which is exactly how it stayed broken fo
 a while. It works by pointing `GITHUB_AUTH_BASE` / `GITHUB_API_BASE` at a local
 double; those are deployment-config-only overrides, and `test.mjs` fails if
 either ever appears in `wrangler.toml`.
+
+## Publishing a report from the site
+
+`/publish` turns a form into a `_reports/*.md` file, copies it to the clipboard
+and opens GitHub's new-file editor, which forks and opens a pull request. There
+is no server side.
+
+The file is **not** prefilled into the URL: GitHub returns 500 at roughly 7,000
+URL characters and 414 past 8,200, while a real report percent-encodes to about
+21,000. Only `?filename=` is sent, and `test/publish.test.mjs` pins that so a
+prefill cannot creep back in.
+
+Two constraints the generator exists to satisfy, both in
+`window.PatchBookPublish` (`assets/patchbook.js`):
+
+- the filename must match `REPORT_RE` in `worker/src/index.js`, or every vote on
+  the merged report returns 400 — hence the ASCII-only slug rules
+- frontmatter values must survive `serve.py`'s hand-rolled parser, which is
+  line-oriented, does `.strip('"')` and nothing else, and supports no multi-line
+  values
 
 ## Vote backend
 

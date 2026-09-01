@@ -109,6 +109,103 @@ ok("clicking a dot opens the report", page.url().includes("/reports/"), page.url
 
 ok("no page errors", errors.length === 0, errors.join(" | "));
 
+
+/* ── Publish form ───────────────────────────────────────────────────────── */
+// The clipboard is the whole handover mechanism and cannot be tested anywhere
+// but here: jsdom has no clipboard, no permissions model and no layout.
+{
+  const ctx = await browser.newContext({
+    permissions: ["clipboard-read", "clipboard-write"],
+    viewport: { width: 1100, height: 900 },
+  });
+  const pub = await ctx.newPage();
+  const pubErrors = [];
+  pub.on("pageerror", (e) => pubErrors.push(e.message));
+  await pub.goto(`${SITE}/publish`, { waitUntil: "networkidle" });
+  await pub.waitForTimeout(300);
+
+  ok("publish page loads its script", await pub.evaluate(() => typeof window.PatchBookPublish === "object"));
+  ok("nav offers all three tabs", (await pub.locator("nav .nav-links a").count()) === 3);
+  ok("the body starts from the section skeleton",
+     (await pub.locator('[name="body"]').inputValue()).startsWith("## TL;DR"));
+
+  // The native date input is a real picker only in a browser.
+  await pub.fill('[name="date"]', "2026-07-04");
+  ok("native date input yields an ISO date", (await pub.locator('[name="date"]').inputValue()) === "2026-07-04");
+
+  await pub.fill('[name="cvss"]', "9.4");
+  await pub.waitForTimeout(120);
+  ok("severity badge previews the band live",
+     (await pub.locator("[data-cvss-preview]").getAttribute("class")).includes("red"),
+     await pub.locator("[data-cvss-preview]").getAttribute("class"));
+
+  // An invalid form must not open a tab or reveal the output panel.
+  await pub.fill('[name="cve_id"]', "nope");
+  await pub.click("[data-publish-submit]");
+  await pub.waitForTimeout(200);
+  ok("an invalid report is blocked before anything opens", await pub.locator("[data-publish-output]").isHidden());
+
+  await pub.fill('[name="cve_id"]', "cve-2026-44444");
+  await pub.fill('[name="title"]', 'Pool overflow in "afd.sys"');
+  await pub.locator('[name="cve_id"]').blur();
+  await pub.waitForTimeout(150);
+  ok("the filename is shown before submitting",
+     (await pub.locator("[data-publish-filename]").textContent()).includes("cve-2026-44444"));
+
+  const [popup] = await Promise.all([
+    pub.waitForEvent("popup").catch(() => null),
+    pub.click("[data-publish-submit]"),
+  ]);
+  await pub.waitForTimeout(500);
+
+  const clip = await pub.evaluate(() => navigator.clipboard.readText());
+  ok("the report reaches the clipboard", clip.startsWith("---\nlayout: report"), clip.slice(0, 30));
+  ok("clipboard and on-screen file agree", clip === (await pub.locator("[data-publish-file]").inputValue()));
+  ok("GitHub's new-file editor is opened",
+     popup !== null && /github\.com/.test(popup.url()) && popup.url().includes("filename"), popup && popup.url().slice(0, 60));
+  ok("a download is offered as well", !!(await pub.locator("[data-publish-download]").getAttribute("href")));
+  ok("no page errors on the publish page", pubErrors.length === 0, pubErrors.join(" | "));
+
+  // Narrow viewport: the form must not overflow.
+  await pub.setViewportSize({ width: 390, height: 800 });
+  await pub.waitForTimeout(200);
+  ok("publish form does not overflow at 390px",
+     (await pub.evaluate(() => document.documentElement.scrollWidth)) <= 400);
+  await ctx.close();
+}
+
+// The clipboard-denied path is the entire flow for anyone who refuses the
+// permission or browses over plain http, so it has to actually work.
+{
+  const ctx = await browser.newContext({ viewport: { width: 1100, height: 900 } });
+  const pub = await ctx.newPage();
+  await pub.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", { get: () => undefined });
+  });
+  await pub.goto(`${SITE}/publish`, { waitUntil: "networkidle" });
+  await pub.fill('[name="cve_id"]', "CVE-2026-55555");
+  await pub.fill('[name="date"]', "2026-02-02");
+  await pub.fill('[name="cvss"]', "3.1");
+  await pub.fill('[name="title"]', "Info leak in cng.sys");
+  await pub.click("[data-publish-submit]");
+  await pub.waitForTimeout(400);
+
+  ok("without a clipboard the file is still shown",
+     (await pub.locator("[data-publish-file]").inputValue()).startsWith("---"));
+  ok("the failure is explained, not silent",
+     /clipboard/i.test(await pub.locator("[data-publish-status]").textContent()));
+  ok("the text is pre-selected for a manual copy",
+     await pub.evaluate(() => {
+       const t = document.querySelector("[data-publish-file]");
+       return t.selectionEnd - t.selectionStart > 50;
+     }));
+  ok("the editor can still be opened by hand",
+     (await pub.locator("[data-publish-open]").getAttribute("href")).includes("/new/"));
+  const box = await pub.locator(".publish-output").boundingBox();
+  ok("the fallback panel has real size", box !== null && box.height > 100, box && box.height);
+  await ctx.close();
+}
+
 await browser.close();
 console.log(bad ? `\n${bad} FAILED` : "\nall passed");
 process.exit(bad ? 1 : 0);

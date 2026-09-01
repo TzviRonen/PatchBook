@@ -147,5 +147,18 @@ check("GitHub bases default to the real thing",
       /GITHUB_AUTH_BASE \|\| "https:\/\/github\.com"/.test(src) &&
       /GITHUB_API_BASE \|\| "https:\/\/api\.github\.com"/.test(src));
 
+
+// 12. Filenames the Publish form generates must be accepted here. If the slug
+// rules ever emit a character outside REPORT_RE, every vote on that report
+// 400s — and by then it is a merged file that needs a rename to fix.
+for (const name of [
+  "_reports/2026-08-29-cve-2026-33827-use-after-free-in-tcpip-sys.md",
+  "_reports/2026-05-05-cve-2026-77777-pool-overflow-in-afd-sys-a-nasty-one.md",
+  "_reports/2026-01-01-cve-2026-00001-report.md",
+]) {
+  const res = await call(`/api/votes?report=${encodeURIComponent(name)}`);
+  check("vote API accepts a generated filename", res.status === 200, name + " → " + res.status);
+}
+
 console.log(failures ? `\n${failures} FAILED` : "\nall passed");
 process.exit(failures ? 1 : 0);
