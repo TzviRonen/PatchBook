@@ -2,7 +2,7 @@
 layout: default
 title: About
 ---
-<div class="page">
+<div class="page page-about">
   <div class="page-header">
     <h1>About <strong>PatchBook</strong></h1>
     <p>A collaborative technical analysis library for closed-source security patches.</p>

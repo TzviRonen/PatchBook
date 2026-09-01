@@ -412,7 +412,7 @@ PUBLISH_TPL = BASE.replace("{% block title %}Reports{% endblock %}", "Publish").
 
 ABOUT_TPL = BASE.replace("{% block title %}Reports{% endblock %}", "About").replace(
     "{% block body %}{% endblock %}", """
-<div class="page">
+<div class="page page-about">
   <div class="page-header">
     <h1>About <strong>PatchBook</strong></h1>
     <p>A collaborative technical analysis library for closed-source security patches.</p>

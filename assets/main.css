@@ -860,3 +860,20 @@ a.category-tile:hover {
 }
 .publish-output[hidden] { display: none; }
 .publish-hint { font-size: 0.85rem; color: var(--muted); }
+
+/* ── about ── */
+/* The lead sits directly above running prose of the same size, so the muted
+   grey used for page subtitles elsewhere read as an accident rather than a
+   hierarchy. Same ink as the body; size carries the emphasis instead. */
+.page-about .page-header p {
+  color: var(--text);
+  font-size: 1.2rem;
+  line-height: 1.5;
+  max-width: 42em;
+}
+.page-about .prose {
+  font-size: 1.1rem;
+  line-height: 1.75;
+  max-width: 42em;
+}
+.page-about .prose p { margin: 1.1rem 0; }
