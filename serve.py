@@ -1,11 +1,11 @@
-"""Minimal Flask server for PatchBook — serves _posts/*.md as a static blog."""
+"""Minimal Flask server for PatchBook — serves _reports/*.md as a static blog."""
 import re
 from pathlib import Path
 
 import markdown as md
 from flask import Flask, abort, render_template_string
 
-POSTS_DIR = Path(__file__).parent / "_posts"
+REPORTS_DIR = Path(__file__).parent / "_reports"
 CSS = (Path(__file__).parent / "assets" / "main.css").read_text()
 
 app = Flask(__name__)
@@ -47,7 +47,7 @@ def _parse(path: Path) -> dict:
 
 
 def _parse_editor_line(editors: list, line: str) -> None:
-    """Accumulate one line of the `editors:` block (see _layouts/post.html).
+    """Accumulate one line of the `editors:` block (see _layouts/report.html).
 
     Handles both accepted shapes: a bare `- username`, and a mapping starting
     with `- name: username` whose `date` / `note` keys follow on later lines.
@@ -67,7 +67,7 @@ def _parse_editor_line(editors: list, line: str) -> None:
 
 
 def _site_config() -> dict:
-    """Read the handful of `_config.yml` keys the post template needs.
+    """Read the handful of `_config.yml` keys the report template needs.
 
     Deliberately a regex over top-level `key: value` lines rather than a YAML
     parse — this preview server has no PyYAML dependency and needs none.
@@ -82,9 +82,9 @@ def _site_config() -> dict:
     return cfg
 
 
-def _all_posts() -> list[dict]:
-    posts = [_parse(p) for p in sorted(POSTS_DIR.glob("*.md"), reverse=True)]
-    return posts
+def _all_reports() -> list[dict]:
+    reports = [_parse(p) for p in sorted(REPORTS_DIR.glob("*.md"), reverse=True)]
+    return reports
 
 
 def _cvss_class(cvss: str) -> str:
@@ -99,7 +99,7 @@ def _cvss_class(cvss: str) -> str:
 
 
 def _render_body(raw: str) -> str:
-    """Render markdown body, stripping the leading H1 (shown in post header)."""
+    """Render markdown body, stripping the leading H1 (shown in report header)."""
     # Remove the first H1 heading to avoid duplicate title
     body = re.sub(r"^#[^#][^\n]*\n", "", raw.lstrip(), count=1)
     return md.markdown(body, extensions=["fenced_code", "tables", "toc", "nl2br"])
@@ -112,7 +112,7 @@ BASE = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Posts{% endblock %} — PatchBook</title>
+  <title>{% block title %}Reports{% endblock %} — PatchBook</title>
   <style>{{ css }}</style>
 </head>
 <body>
@@ -122,7 +122,7 @@ BASE = """<!DOCTYPE html>
     PatchBook
   </a>
   <div class="nav-links">
-    <a href="/"{% if active in ('home', 'post') %} class="active"{% endif %}>Posts</a>
+    <a href="/"{% if active in ("home", "report") %} class="active"{% endif %}>Reports</a>
     <a href="/about"{% if active == 'about' %} class="active"{% endif %}>About</a>
   </div>
 </nav>
@@ -130,66 +130,66 @@ BASE = """<!DOCTYPE html>
 <footer>
   <div class="footer-inner">
     <span>PatchBook — Windows kernel CVE analysis</span>
-    <span>Powered by <a href="https://github.com/tzvironen/kernel-cve-pipeline">kernel-cve-pipeline</a></span>
+    <span>Windows kernel patch analysis</span>
   </div>
 </footer>
 </body>
 </html>"""
 
-HOME_TPL = BASE.replace("{% block title %}Posts{% endblock %}", "Posts").replace(
+HOME_TPL = BASE.replace("{% block title %}Reports{% endblock %}", "Reports").replace(
     "{% block body %}{% endblock %}", """
 <div class="page">
   <div class="page-header">
-    <h1>CVE Analysis Posts</h1>
-    <p>Deep-dives into Windows kernel patches — binary diffs, decompilation, and exploitation primitives.</p>
+    <h1>CVE Analysis Reports</h1>
+    <p>Deep-dives into Windows kernel patches — vulnerability reports with decompilations</p>
   </div>
-  {% if posts %}
-  <div class="post-list">
-    {% for p in posts %}
-    <a class="post-card" href="/posts/{{ p._slug }}">
-      <div class="post-card-meta">
+  {% if reports %}
+  <div class="report-list">
+    {% for p in reports %}
+    <a class="report-card" href="/reports/{{ p._slug }}">
+      <div class="report-card-meta">
         <div class="flex-gap">
           {% if p.cve_id %}<span class="badge blue mono">{{ p.cve_id }}</span>{% endif %}
           {% if p.cvss %}<span class="badge {{ cvss_class(p.cvss) }}">CVSS {{ p.cvss }}</span>{% endif %}
         </div>
-        <span class="post-date">{{ p.date }}</span>
+        <span class="report-date">{{ p.date }}</span>
       </div>
-      <h2 class="post-card-title">{{ p.title }}</h2>
-      {% if p.excerpt %}<p class="post-card-excerpt">{{ strip_md(p.excerpt) }}</p>{% endif %}
-      <span class="post-card-link">Read full post →</span>
+      <h2 class="report-card-title">{{ p.title }}</h2>
+      {% if p.excerpt %}<p class="report-card-excerpt">{{ strip_md(p.excerpt) }}</p>{% endif %}
+      <span class="report-card-link">Read full report →</span>
     </a>
     {% endfor %}
   </div>
   {% else %}
-  <div class="empty-state"><div class="empty-icon">📭</div><p>No posts yet.</p></div>
+  <div class="empty-state"><div class="empty-icon">📭</div><p>No reports yet.</p></div>
   {% endif %}
 </div>
 """)
 
-POST_TPL = BASE.replace("{% block title %}Posts{% endblock %}", "{{ post.title }}").replace(
+REPORT_TPL = BASE.replace("{% block title %}Reports{% endblock %}", "{{ report.title }}").replace(
     "{% block body %}{% endblock %}", """
-<div class="page page-post">
-  <div class="post-header">
-    <div class="post-header-meta">
+<div class="page page-report">
+  <div class="report-header">
+    <div class="report-header-meta">
       <div class="flex-gap">
-        {% if post.cve_id %}<span class="badge blue mono">{{ post.cve_id }}</span>{% endif %}
-        {% if post.cvss %}<span class="badge {{ cvss_class(post.cvss) }}">CVSS {{ post.cvss }}</span>{% endif %}
-        <span class="muted small">{{ post.date }}</span>
+        {% if report.cve_id %}<span class="badge blue mono">{{ report.cve_id }}</span>{% endif %}
+        {% if report.cvss %}<span class="badge {{ cvss_class(report.cvss) }}">CVSS {{ report.cvss }}</span>{% endif %}
+        <span class="muted small">{{ report.date }}</span>
       </div>
-      <a href="/" class="btn btn-muted back-link">← All posts</a>
+      <a href="/" class="btn btn-muted back-link">← All reports</a>
     </div>
-    <h1 class="post-title">{{ post.title }}</h1>
+    <h1 class="report-title">{{ report.title }}</h1>
 
-    {# Mirrors _layouts/post.html: votes come live from the Worker API, the
+    {# Mirrors _layouts/report.html: votes come live from the Worker API, the
        voter list appears only in the popover on the count, and edits go
        through GitHub PRs. #}
     <div class="community community-bar"
-         data-post-path="_posts/{{ post._slug }}.md"
-         data-cve="{{ post.cve_id or '' }}"
+         data-report-path="_reports/{{ report._slug }}.md"
+         data-cve="{{ report.cve_id or '' }}"
          data-repo="{{ site.github_repo or '' }}"
          data-branch="{{ site.github_branch or 'main' }}"
          data-api="{{ site.votes_api or '' }}">
-      <div class="votes" title="Reader fact-check of this AI-generated post">
+      <div class="votes" title="Reader fact-check of this AI-generated report">
         <span class="community-tally-label">Community check</span>
         {% for verdict, label, cls, symbol in [
              ('valid', 'Valid', 'green', '✓'),
@@ -213,8 +213,8 @@ POST_TPL = BASE.replace("{% block title %}Posts{% endblock %}", "{{ post.title }
           <summary class="btn btn-muted">Suggest change</summary>
           <div class="community-form">
             <p class="muted small">
-              Posts here are AI-generated and may be wrong. Edit the source directly on
-              GitHub — saving opens a pull request. Add yourself to the post's
+              Reports here are AI-generated and may be wrong. Edit the source directly on
+              GitHub — saving opens a pull request. Add yourself to the report's
               <code>editors:</code> list in the same PR and your name will appear at the
               bottom once it's merged.
             </p>
@@ -232,11 +232,11 @@ POST_TPL = BASE.replace("{% block title %}Posts{% endblock %}", "{{ post.title }
   </div>
   <article class="prose">{{ body|safe }}</article>
 
-  {% if post.editors %}
-  <section class="post-editors">
+  {% if report.editors %}
+  <section class="report-editors">
     <h2>Edited by</h2>
     <ul>
-      {% for e in post.editors %}
+      {% for e in report.editors %}
       <li>
         <a href="https://github.com/{{ e.name }}" target="_blank" rel="noopener nofollow">{{ e.name }}</a>
         {% if e.date %}<span class="muted small">· {{ e.date }}</span>{% endif %}
@@ -250,19 +250,18 @@ POST_TPL = BASE.replace("{% block title %}Posts{% endblock %}", "{{ post.title }
 <script src="/assets/patchbook.js"></script>
 """)
 
-ABOUT_TPL = BASE.replace("{% block title %}Posts{% endblock %}", "About").replace(
+ABOUT_TPL = BASE.replace("{% block title %}Reports{% endblock %}", "About").replace(
     "{% block body %}{% endblock %}", """
 <div class="page">
   <div class="page-header"><h1>About PatchBook</h1></div>
   <article class="prose">
     <p>PatchBook publishes deep technical analyses of Windows kernel security patches.
-    Each post is generated by
-    <a href="https://github.com/tzvironen/kernel-cve-pipeline">kernel-cve-pipeline</a> —
+    Each report is generated by
     an automated system that downloads patched and unpatched Windows binaries,
     diffs them with Ghidriff, identifies the changed function via a Claude agent,
-    and writes a structured post covering the root cause, patch mechanics, and exploitation primitive.</p>
+    and writes a structured report covering the root cause, patch mechanics, and exploitation primitive.</p>
     <h2>Audience</h2>
-    <p>Posts assume familiarity with C, Windows kernel internals, and common vulnerability
+    <p>Reports assume familiarity with C, Windows kernel internals, and common vulnerability
     classes (TOCTOU, UAF, pool overflows).</p>
   </article>
 </div>
@@ -272,21 +271,21 @@ ABOUT_TPL = BASE.replace("{% block title %}Posts{% endblock %}", "About").replac
 
 @app.route("/")
 def home():
-    posts = _all_posts()
-    return render_template_string(HOME_TPL, posts=posts, css=CSS,
+    reports = _all_reports()
+    return render_template_string(HOME_TPL, reports=reports, css=CSS,
                                   active="home", cvss_class=_cvss_class,
                                   strip_md=_strip_md)
 
 
-@app.route("/posts/<slug>")
-def post(slug: str):
-    path = POSTS_DIR / f"{slug}.md"
+@app.route("/reports/<slug>")
+def report(slug: str):
+    path = REPORTS_DIR / f"{slug}.md"
     if not path.exists():
         abort(404)
     p = _parse(path)
     body = _render_body(p["_body"])
-    return render_template_string(POST_TPL, post=p, body=body, css=CSS,
-                                  active="post", cvss_class=_cvss_class,
+    return render_template_string(REPORT_TPL, report=p, body=body, css=CSS,
+                                  active="report", cvss_class=_cvss_class,
                                   strip_md=_strip_md, site=_site_config())
 
 

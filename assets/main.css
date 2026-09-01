@@ -1,4 +1,4 @@
-/* PatchBook — ported from kernel-cve-pipeline design system */
+/* PatchBook — design system */
 
 :root {
   --bg:          #ffffff;
@@ -230,7 +230,7 @@ footer {
 .vote-count:hover, .vote-count:focus-visible { color: var(--text); }
 
 /* Who voted — reachable by hover, by keyboard focus, and by tapping the count
-   (which toggles .is-open). Never rendered into the post body. */
+   (which toggles .is-open). Never rendered into the report body. */
 .voter-popover {
   position: absolute;
   top: calc(100% + 0.4rem);
@@ -247,8 +247,13 @@ footer {
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
 }
+/* Focus is scoped to the count itself, not the group. `:focus-within` on the
+   group also matched the vote buttons inside it, so casting a vote left the
+   popover stuck open until something else took focus. `:focus-visible` keeps
+   the list reachable by keyboard without a mouse click pinning it open;
+   .voter-popover is the count's next sibling, hence `~`. */
 .vote-group:hover .voter-popover,
-.vote-group:focus-within .voter-popover,
+.vote-count:focus-visible ~ .voter-popover,
 .vote-group.is-open .voter-popover { display: block; }
 
 .voter-list { list-style: none; margin: 0; padding: 0; }
@@ -345,14 +350,14 @@ footer {
 .community-form .btn { align-self: flex-start; }
 .community-edit { align-self: flex-start; }
 
-/* editor credits at the bottom of a post — from the `editors:` frontmatter,
+/* editor credits at the bottom of a report — from the `editors:` frontmatter,
    which PR authors maintain by hand */
-.post-editors {
+.report-editors {
   margin-top: 2.5rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--border);
 }
-.post-editors h2 {
+.report-editors h2 {
   margin: 0 0 0.6rem;
   font-size: 0.72rem;
   font-weight: 700;
@@ -360,12 +365,12 @@ footer {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-.post-editors ul {
+.report-editors ul {
   list-style: none;
   margin: 0;
   padding: 0;
 }
-.post-editors li {
+.report-editors li {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -374,9 +379,9 @@ footer {
   border-bottom: 1px solid var(--border-soft);
   font-size: 0.9rem;
 }
-.post-editors li:last-child { border-bottom: none; }
-.post-editors a { color: var(--blue); text-decoration: none; font-weight: 600; }
-.post-editors a:hover { text-decoration: underline; }
+.report-editors li:last-child { border-bottom: none; }
+.report-editors a { color: var(--blue); text-decoration: none; font-weight: 600; }
+.report-editors a:hover { text-decoration: underline; }
 
 /* ── layout ── */
 .page {
@@ -386,7 +391,7 @@ footer {
   flex: 1;
   width: 100%;
 }
-.page-post { max-width: 780px; }
+.page-report { max-width: 780px; }
 .page-header { margin-bottom: 2rem; }
 .page-header h1 {
   font-size: 1.75rem;
@@ -395,10 +400,10 @@ footer {
 }
 .page-header p { color: var(--muted); margin-top: 0.4rem; font-size: 1rem; }
 
-/* ── post list (homepage) ── */
-.post-list { display: flex; flex-direction: column; gap: 1rem; }
+/* ── report list (homepage) ── */
+.report-list { display: flex; flex-direction: column; gap: 1rem; }
 
-.post-card {
+.report-card {
   display: block;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -409,11 +414,11 @@ footer {
   color: inherit;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-.post-card:hover {
+.report-card:hover {
   border-color: var(--blue);
   box-shadow: var(--shadow);
 }
-.post-card-meta {
+.report-card-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -421,43 +426,43 @@ footer {
   flex-wrap: wrap;
   gap: 0.5rem;
 }
-.post-date {
+.report-date {
   font-size: 0.82rem;
   color: var(--muted2);
   font-family: var(--font-mono);
 }
-.post-card-title {
+.report-card-title {
   font-size: 1.15rem;
   font-weight: 700;
   color: var(--text);
   margin-bottom: 0.3rem;
   line-height: 1.4;
 }
-.post-card-subtitle {
+.report-card-subtitle {
   font-size: 0.95rem;
   color: var(--blue);
   font-weight: 600;
   margin-bottom: 0.5rem;
 }
-.post-card-excerpt {
+.report-card-excerpt {
   font-size: 0.92rem;
   color: var(--muted);
   line-height: 1.65;
   margin-bottom: 0.75rem;
 }
-.post-card-link {
+.report-card-link {
   font-size: 0.88rem;
   color: var(--blue);
   font-weight: 600;
 }
 
-/* ── post page header ── */
-.post-header {
+/* ── report page header ── */
+.report-header {
   margin-bottom: 2rem;
   padding-bottom: 1.5rem;
   border-bottom: 1px solid var(--border);
 }
-.post-header-meta {
+.report-header-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -466,7 +471,7 @@ footer {
   gap: 0.5rem;
 }
 .back-link { font-size: 0.85rem; }
-.post-title {
+.report-title {
   font-size: 1.85rem;
   font-weight: 700;
   line-height: 1.3;
@@ -593,6 +598,6 @@ footer {
 @media (max-width: 600px) {
   nav { padding: 0 1rem; }
   .page { padding: 1.5rem 1rem; }
-  .post-title { font-size: 1.4rem; }
+  .report-title { font-size: 1.4rem; }
   .footer-inner { flex-direction: column; text-align: center; }
 }

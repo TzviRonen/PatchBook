@@ -14,7 +14,7 @@ import http from "node:http";
 
 const SITE = "http://127.0.0.1:3004";
 const WORKER_ORIGIN = "http://127.0.0.1:3003";
-const POST = "_posts/2026-08-29-cve-2026-33827-tcpip-remote-code-execution.md";
+const REPORT = "_reports/2026-08-29-cve-2026-33827-tcpip-remote-code-execution.md";
 
 let failures = 0;
 const check = (n, c, e = "") => {
@@ -85,18 +85,18 @@ const DB = {
     let args = [];
     const api = {
       bind(...a) { args = a; return api; },
-      async all() { return { results: rows.filter((r) => r.post_id === args[0]) }; },
+      async all() { return { results: rows.filter((r) => r.report_id === args[0]) }; },
       async run() {
         if (/^DELETE/.test(sql.trim())) {
-          const i = rows.findIndex((r) => r.post_id === args[0] && r.user_id === args[1]);
+          const i = rows.findIndex((r) => r.report_id === args[0] && r.user_id === args[1]);
           if (i >= 0) rows.splice(i, 1);
           return;
         }
-        const [post_id, user_id, login, verdict, note] = args;
-        const existing = rows.find((r) => r.post_id === post_id && r.user_id === user_id);
+        const [report_id, user_id, login, verdict, note] = args;
+        const existing = rows.find((r) => r.report_id === report_id && r.user_id === user_id);
         const at = new Date().toISOString();
         if (existing) Object.assign(existing, { login, verdict, note, updated_at: at });
-        else rows.push({ post_id, user_id, login, verdict, note, updated_at: at });
+        else rows.push({ report_id, user_id, login, verdict, note, updated_at: at });
       },
     };
     return api;
@@ -118,7 +118,7 @@ const call = (path, opts = {}) =>
 
 /* ── the round trip ─────────────────────────────────────────────────────── */
 
-const postUrl = `${SITE}/posts/2026-08-29-cve-2026-33827-tcpip-remote-code-execution`;
+const postUrl = `${SITE}/reports/2026-08-29-cve-2026-33827-tcpip-remote-code-execution`;
 
 // 1. the site sends the reader to /auth/login
 let r = await call("/auth/login?return=" + encodeURIComponent(postUrl));
@@ -139,7 +139,7 @@ check("callback carries code and state",
   !!cbUrl.searchParams.get("code") && !!cbUrl.searchParams.get("state"));
 
 r = await call(cbUrl.pathname + cbUrl.search);
-check("callback redirects back to the post", r.status === 302, r.status);
+check("callback redirects back to the report", r.status === 302, r.status);
 
 const finalUrl = new URL(r.headers.get("Location"));
 check("returns to the exact page the reader came from",
@@ -161,7 +161,7 @@ check("session identifies the GitHub user", (await r.json()).login === "octocat"
 r = await call("/api/vote", {
   method: "POST",
   headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-  body: JSON.stringify({ post: POST, verdict: "valid" }),
+  body: JSON.stringify({ report: REPORT, verdict: "valid" }),
 });
 let body = await r.json();
 check("vote recorded under the GitHub identity",

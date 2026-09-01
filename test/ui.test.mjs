@@ -17,17 +17,17 @@ import fs from "node:fs";
 import http from "node:http";
 
 // ── stub vote API ───────────────────────────────────────────────────────
-const POST="_posts/2026-08-29-cve-2026-33827-tcpip-remote-code-execution.md";
+const REPORT="_reports/2026-08-29-cve-2026-33827-tcpip-remote-code-execution.md";
 let rows=[{login:"carol",verdict:"valid",note:"confirmed against my own diff",at:"2026-08-29T10:00:00Z",uid:3},
           {login:"dave",verdict:"ai-slop",note:null,at:"2026-08-29T11:00:00Z",uid:4}];
 const ME={uid:1,login:"alice"};
-const state=(authed)=>({post:POST,counts:{valid:rows.filter(r=>r.verdict==="valid").length,"ai-slop":rows.filter(r=>r.verdict==="ai-slop").length},
+const state=(authed)=>({report:REPORT,counts:{valid:rows.filter(r=>r.verdict==="valid").length,"ai-slop":rows.filter(r=>r.verdict==="ai-slop").length},
   voters:rows.map(({login,verdict,note,at})=>({login,verdict,note,at})),
   you:authed?(rows.find(r=>r.uid===ME.uid)?{verdict:rows.find(r=>r.uid===ME.uid).verdict,note:null}:null):null});
 http.createServer((req,res)=>{
   const u=new URL(req.url,"http://x"); const authed=(req.headers.authorization||"").startsWith("Bearer ");
   const h={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"Content-Type, Authorization",
-           "Access-Control-Allow-Methods":"GET, POST, DELETE, OPTIONS","Content-Type":"application/json","Cache-Control":"no-store"};
+           "Access-Control-Allow-Methods":"GET, REPORT, DELETE, OPTIONS","Content-Type":"application/json","Cache-Control":"no-store"};
   if(req.method==="OPTIONS"){res.writeHead(204,h);return res.end();}
   let body="";req.on("data",d=>body+=d);req.on("end",()=>{
     if(req.method==="POST"){const v=JSON.parse(body).verdict;rows=rows.filter(r=>r.uid!==ME.uid);
@@ -37,7 +37,7 @@ http.createServer((req,res)=>{
 }).listen(4787);
 
 
-const PAGE = "http://127.0.0.1:3004/posts/2026-08-29-cve-2026-33827-tcpip-remote-code-execution";
+const PAGE = "http://127.0.0.1:3004/reports/2026-08-29-cve-2026-33827-tcpip-remote-code-execution";
 const JS = fs.readFileSync(new URL("../assets/patchbook.js", import.meta.url), "utf8");
 
 // Point the page at the stub above regardless of what `votes_api` in
@@ -168,11 +168,28 @@ check("clicking outside closes it", !group.classList.contains("is-open"));
         "offline=" + dw.document.querySelector(".community-bar").dataset.offline + " navigated=" + navigated3);
 }
 
+// ── the popover must not survive casting a vote ─────────────────────────
+// jsdom cannot evaluate :focus-within/:focus-visible, so pin the CSS contract
+// directly and the JS half behaviourally.
+{
+  const css = fs.readFileSync(new URL("../assets/main.css", import.meta.url), "utf8");
+  check("popover no longer held open by focus anywhere in the group",
+        !/\.vote-group:focus-within\s+\.voter-popover/.test(css));
+  check("popover still opens on keyboard focus of the count",
+        /\.vote-count:focus-visible\s*~\s*\.voter-popover/.test(css));
+
+  const g = w.document.querySelector('.vote-group[data-verdict="valid"]');
+  g.classList.add("is-open");
+  g.querySelector(".vote-btn").click();
+  await settle();
+  check("casting a vote closes an open voter list", !g.classList.contains("is-open"));
+}
+
 // ── edit flow still points at GitHub ────────────────────────────────────
 const link = w.document.querySelector(".community-edit");
 w.PatchBook.editOnGitHub(link);
 check("edit link opens the GitHub web editor (PR flow)",
-      link.href === "https://github.com/TzviRonen/PatchBook/edit/main/_posts/2026-08-29-cve-2026-33827-tcpip-remote-code-execution.md", link.href);
+      link.href === "https://github.com/TzviRonen/PatchBook/edit/main/_reports/2026-08-29-cve-2026-33827-tcpip-remote-code-execution.md", link.href);
 
 console.log(failures ? `\n${failures} FAILED` : "\nall passed");
 process.exit(failures?1:0);

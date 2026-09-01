@@ -5,7 +5,7 @@ import worker from "./src/index.js";
 import fs from "node:fs";
 
 // Minimal in-memory stand-in for the D1 binding: enough to exercise the two
-// statements the Worker issues (select-by-post, upsert, delete).
+// statements the Worker issues (select-by-report, upsert, delete).
 const rows = [];
 const DB = {
   prepare(sql) {
@@ -13,21 +13,21 @@ const DB = {
     const api = {
       bind(...a) { args = a; return api; },
       async all() {
-        const [post] = args;
-        return { results: rows.filter(r => r.post_id === post) };
+        const [report] = args;
+        return { results: rows.filter(r => r.report_id === report) };
       },
       async run() {
         if (/^DELETE/.test(sql.trim())) {
-          const [post, uid] = args;
-          const i = rows.findIndex(r => r.post_id === post && r.user_id === uid);
+          const [report, uid] = args;
+          const i = rows.findIndex(r => r.report_id === report && r.user_id === uid);
           if (i >= 0) rows.splice(i, 1);
           return;
         }
-        const [post_id, user_id, login, verdict, note] = args;
+        const [report_id, user_id, login, verdict, note] = args;
         const at = new Date().toISOString().replace(/\.\d+Z$/, "Z");
-        const existing = rows.find(r => r.post_id === post_id && r.user_id === user_id);
+        const existing = rows.find(r => r.report_id === report_id && r.user_id === user_id);
         if (existing) Object.assign(existing, { login, verdict, note, updated_at: at });
-        else rows.push({ post_id, user_id, login, verdict, note, updated_at: at });
+        else rows.push({ report_id, user_id, login, verdict, note, updated_at: at });
       },
     };
     return api;
@@ -42,7 +42,7 @@ const env = {
   GITHUB_CLIENT_SECRET: "csecret",
   ALLOWED_ORIGINS: ORIGIN + ",http://127.0.0.1:4000",
 };
-const POST = "_posts/2026-08-29-cve-2026-33827-tcpip-remote-code-execution.md";
+const REPORT = "_reports/2026-08-29-cve-2026-33827-tcpip-remote-code-execution.md";
 
 const call = (path, opts = {}) =>
   worker.fetch(new Request("https://api.example.workers.dev" + path, {
@@ -70,61 +70,61 @@ const alice = await mint(1, "alice");
 const bob = await mint(2, "bob");
 
 // 1. empty state, anonymous read
-let r = await call(`/api/votes?post=${encodeURIComponent(POST)}`);
+let r = await call(`/api/votes?report=${encodeURIComponent(REPORT)}`);
 let j = await r.json();
 check("anonymous read works", r.status === 200 && j.counts.valid === 0 && j.you === null, JSON.stringify(j));
 check("CORS echoes allowed origin", r.headers.get("Access-Control-Allow-Origin") === ORIGIN);
 check("counts are never cached", r.headers.get("Cache-Control") === "no-store");
 
 // 2. voting requires login
-r = await call("/api/vote", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({post:POST, verdict:"valid"}) });
+r = await call("/api/vote", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({report:REPORT, verdict:"valid"}) });
 check("anonymous vote rejected", r.status === 401);
 
 // 3. alice votes valid
-r = await call("/api/vote", { method:"POST", headers: auth(alice), body: JSON.stringify({post:POST, verdict:"valid", note:"  checked   the  offsets \n"}) });
+r = await call("/api/vote", { method:"POST", headers: auth(alice), body: JSON.stringify({report:REPORT, verdict:"valid", note:"  checked   the  offsets \n"}) });
 j = await r.json();
 check("vote recorded", j.counts.valid === 1 && j.you.verdict === "valid", JSON.stringify(j));
 check("note is whitespace-collapsed", j.voters[0].note === "checked the offsets", JSON.stringify(j.voters[0]));
 
 // 4. alice votes again -> replaces, never double-counts
-r = await call("/api/vote", { method:"POST", headers: auth(alice), body: JSON.stringify({post:POST, verdict:"ai-slop"}) });
+r = await call("/api/vote", { method:"POST", headers: auth(alice), body: JSON.stringify({report:REPORT, verdict:"ai-slop"}) });
 j = await r.json();
 check("re-vote replaces, no double count", j.counts.valid === 0 && j.counts["ai-slop"] === 1, JSON.stringify(j.counts));
 
 // 5. bob votes -> voter list has both names
-await call("/api/vote", { method:"POST", headers: auth(bob), body: JSON.stringify({post:POST, verdict:"valid"}) });
-r = await call(`/api/votes?post=${encodeURIComponent(POST)}`, { headers: { Authorization: "Bearer " + alice } });
+await call("/api/vote", { method:"POST", headers: auth(bob), body: JSON.stringify({report:REPORT, verdict:"valid"}) });
+r = await call(`/api/votes?report=${encodeURIComponent(REPORT)}`, { headers: { Authorization: "Bearer " + alice } });
 j = await r.json();
 check("voter names returned live", j.voters.map(v=>v.login).sort().join(",") === "alice,bob", JSON.stringify(j.voters));
 check("`you` reflects the caller", j.you.verdict === "ai-slop");
 
 // 6. retract
-r = await call(`/api/vote?post=${encodeURIComponent(POST)}`, { method:"DELETE", headers: auth(alice) });
+r = await call(`/api/vote?report=${encodeURIComponent(REPORT)}`, { method:"DELETE", headers: auth(alice) });
 j = await r.json();
 check("retract removes only your vote", j.counts["ai-slop"] === 0 && j.counts.valid === 1 && j.you === null, JSON.stringify(j));
 
 // 7. input validation
-r = await call("/api/vote", { method:"POST", headers: auth(alice), body: JSON.stringify({post:"../../etc/passwd", verdict:"valid"}) });
+r = await call("/api/vote", { method:"POST", headers: auth(alice), body: JSON.stringify({report:"../../etc/passwd", verdict:"valid"}) });
 check("path traversal rejected", r.status === 400);
-r = await call("/api/vote", { method:"POST", headers: auth(alice), body: JSON.stringify({post:POST, verdict:"spam"}) });
+r = await call("/api/vote", { method:"POST", headers: auth(alice), body: JSON.stringify({report:REPORT, verdict:"spam"}) });
 check("bad verdict rejected", r.status === 400);
 r = await call("/api/vote", { method:"POST", headers: auth(alice), body: "not json" });
 check("malformed body rejected", r.status === 400);
 
 // 8. token forgery / expiry
-r = await call("/api/vote", { method:"POST", headers: auth((await mint(9,"mallory")).replace(/.$/, "A")), body: JSON.stringify({post:POST, verdict:"valid"}) });
+r = await call("/api/vote", { method:"POST", headers: auth((await mint(9,"mallory")).replace(/.$/, "A")), body: JSON.stringify({report:REPORT, verdict:"valid"}) });
 check("tampered signature rejected", r.status === 401);
-r = await call("/api/vote", { method:"POST", headers: auth(await mint(9,"mallory", Math.floor(Date.now()/1000)-10)), body: JSON.stringify({post:POST, verdict:"valid"}) });
+r = await call("/api/vote", { method:"POST", headers: auth(await mint(9,"mallory", Math.floor(Date.now()/1000)-10)), body: JSON.stringify({report:REPORT, verdict:"valid"}) });
 check("expired token rejected", r.status === 401);
 
 // 9. open-redirect guard on OAuth
 r = await call("/auth/login?return=" + encodeURIComponent("https://evil.example/steal"));
 check("foreign return URL rejected", r.status === 400);
-r = await call("/auth/login?return=" + encodeURIComponent(ORIGIN + "/patchbook/posts/x/"));
+r = await call("/auth/login?return=" + encodeURIComponent(ORIGIN + "/PatchBook/reports/x/"));
 check("own-origin return URL accepted", r.status === 302 && r.headers.get("Location").startsWith("https://github.com/login/oauth/authorize"), r.status);
 
 // 10. CORS from a foreign origin gets no allow header
-r = await worker.fetch(new Request("https://api.example.workers.dev/api/votes?post=" + encodeURIComponent(POST), { headers: { Origin: "https://evil.example" } }), env);
+r = await worker.fetch(new Request("https://api.example.workers.dev/api/votes?report=" + encodeURIComponent(REPORT), { headers: { Origin: "https://evil.example" } }), env);
 check("foreign origin gets no CORS grant", r.headers.get("Access-Control-Allow-Origin") === null);
 
 // 11. the deployed origin allowlist itself — this is the setting that keeps

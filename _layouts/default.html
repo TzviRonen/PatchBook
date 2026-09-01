@@ -7,7 +7,12 @@
   <link rel="stylesheet" href="{{ '/assets/main.css' | relative_url }}">
   <link rel="icon" type="image/svg+xml" href="{{ '/assets/favicon.svg' | relative_url }}">
   {% seo %}
-  {% feed_meta %}
+  {%- comment -%}
+    Not {% feed_meta %}: it advertises the site.posts feed, which is empty —
+    reports are a collection. See the `feed:` block in _config.yml.
+  {%- endcomment -%}
+  <link type="application/atom+xml" rel="alternate"
+        href="{{ '/feed.xml' | absolute_url }}" title="{{ site.title | escape }}" />
 </head>
 <body>
 <nav>
@@ -16,7 +21,7 @@
     PatchBook
   </a>
   <div class="nav-links">
-    <a href="{{ '/' | relative_url }}"{% if page.url == '/' %} class="active"{% endif %}>Posts</a>
+    <a href="{{ '/' | relative_url }}"{% if page.url == '/' %} class="active"{% endif %}>Reports</a>
     <a href="{{ '/about' | relative_url }}"{% if page.url == '/about/' %} class="active"{% endif %}>About</a>
   </div>
 </nav>
@@ -24,7 +29,7 @@
 <footer>
   <div class="footer-inner">
     <span>PatchBook — Windows kernel CVE analysis</span>
-    <span>Powered by <a href="https://github.com/tzvironen/kernel-cve-pipeline">kernel-cve-pipeline</a></span>
+    <span>Windows kernel patch analysis</span>
   </div>
 </footer>
 </body>

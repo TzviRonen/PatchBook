@@ -1,17 +1,17 @@
-Thanks for correcting a post! These analyses are AI-generated, so fixes from
+Thanks for correcting a report! These analyses are AI-generated, so fixes from
 readers who actually know the binary are the point of this whole setup.
 
 ## Credit yourself
 
-**Add yourself to the post's `editors:` frontmatter in this same PR** — that
-list is what renders as "Edited by" at the bottom of the post. Nothing is
+**Add yourself to the report's `editors:` frontmatter in this same PR** — that
+list is what renders as "Edited by" at the bottom of the report. Nothing is
 automated, so if you don't add it, you won't be credited.
 
-At the top of the `_posts/*.md` file you changed:
+At the top of the `_reports/*.md` file you changed:
 
 ```yaml
 ---
-layout: post
+layout: report
 title: "…"
 editors:
   - name: your-github-username
@@ -32,4 +32,4 @@ Add a new entry rather than editing someone else's.
 ---
 
 Votes ("valid" / "AI-slop") aren't part of this — those are cast on the site
-itself and stored outside the repo. This PR is only about the post's content.
+itself and stored outside the repo. This PR is only about the report's content.

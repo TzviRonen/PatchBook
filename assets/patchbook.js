@@ -8,7 +8,7 @@
  *  - Edits stay on GitHub. "Edit on GitHub" opens the web editor, which forks
  *    and opens a pull request for non-collaborators; the change only appears on
  *    the site once that PR is merged and Pages rebuilds. Nothing here writes
- *    post content.
+ *    report content.
  */
 window.PatchBook = (function () {
   var TOKEN_KEY = "pb_token";
@@ -20,11 +20,11 @@ window.PatchBook = (function () {
   function repo(el) {
     return section(el).dataset.repo;
   }
-  function postPath(el) {
-    return section(el).dataset.postPath;
+  function reportPath(el) {
+    return section(el).dataset.reportPath;
   }
   function cve(el) {
-    return section(el).dataset.cve || "post";
+    return section(el).dataset.cve || "report";
   }
   function branch(el) {
     return section(el).dataset.branch || "main";
@@ -108,7 +108,7 @@ window.PatchBook = (function () {
         : "Vote " + verdict;
 
       // The voter list is deliberately *only* in this popover, never in the
-      // post body. It is rebuilt from the live response each time.
+      // report body. It is rebuilt from the live response each time.
       var list = group.querySelector(".voter-list");
       list.textContent = "";
       if (!voters.length) {
@@ -146,7 +146,7 @@ window.PatchBook = (function () {
   /* ── vote actions ───────────────────────────────────────────────────── */
 
   function fetchVotes(root) {
-    var url = api(root) + "/api/votes?post=" + encodeURIComponent(postPath(root));
+    var url = api(root) + "/api/votes?report=" + encodeURIComponent(reportPath(root));
     return fetch(url, { headers: authHeaders() })
       .then(function (r) {
         if (r.status === 401) {
@@ -235,14 +235,14 @@ window.PatchBook = (function () {
 
     var url = api(root) + "/api/vote";
     var request = retracting
-      ? fetch(url + "?post=" + encodeURIComponent(postPath(root)), {
+      ? fetch(url + "?report=" + encodeURIComponent(reportPath(root)), {
           method: "DELETE",
           headers: authHeaders(),
         })
       : fetch(url, {
           method: "POST",
           headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
-          body: JSON.stringify({ post: postPath(root), verdict: verdict }),
+          body: JSON.stringify({ report: reportPath(root), verdict: verdict }),
         });
 
     request
@@ -281,13 +281,20 @@ window.PatchBook = (function () {
         count.setAttribute("aria-expanded", open ? "true" : "false");
       });
       count.addEventListener("keydown", function (e) {
-        if (e.key === "Escape") group.classList.remove("is-open");
+        if (e.key !== "Escape") return;
+        group.classList.remove("is-open");
+        count.setAttribute("aria-expanded", "false");
+        // Without blurring, :focus-visible still matches and Escape looks
+        // like it did nothing.
+        count.blur();
       });
     });
 
     document.addEventListener("click", function (e) {
       document.querySelectorAll(".vote-group.is-open").forEach(function (group) {
-        if (!group.contains(e.target)) {
+        // Casting a vote closes the list too: the buttons live inside the
+        // group, so a containment check alone would keep it open.
+        if (!group.contains(e.target) || e.target.closest(".vote-btn")) {
           group.classList.remove("is-open");
           group.querySelector(".vote-count").setAttribute("aria-expanded", "false");
         }
@@ -341,7 +348,7 @@ window.PatchBook = (function () {
   function submitSuggestion(form) {
     var text = field(form, "suggestion");
     if (!text) return false;
-    var body = "Suggested change for `" + postPath(form) + "`:\n\n" + text + "\n";
+    var body = "Suggested change for `" + reportPath(form) + "`:\n\n" + text + "\n";
     window.open(
       issueUrl(form, "suggestion", "[suggestion] " + cve(form), body),
       "_blank",
@@ -351,11 +358,11 @@ window.PatchBook = (function () {
     return false;
   }
 
-  // Open GitHub's web editor for this post's source. GitHub auto-forks and
+  // Open GitHub's web editor for this report's source. GitHub auto-forks and
   // opens a PR on save for readers without write access.
   function editOnGitHub(link) {
     link.href =
-      "https://github.com/" + repo(link) + "/edit/" + branch(link) + "/" + postPath(link);
+      "https://github.com/" + repo(link) + "/edit/" + branch(link) + "/" + reportPath(link);
     return true; // let the anchor navigate (target=_blank)
   }
 

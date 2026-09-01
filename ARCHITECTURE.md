@@ -14,11 +14,11 @@ different backends:
 | **Wants to be** | instant, one per person, attributable | reviewed before it lands |
 | **Backend** | Cloudflare Worker + D1 (`worker/`) | GitHub pull requests |
 | **Visible** | immediately, on click | only after the PR is merged |
-| **Stored in** | the vote database — never the repo | the post's git history |
+| **Stored in** | the vote database — never the repo | the report's git history |
 | **Identity** | GitHub OAuth (login required) | the PR author's GitHub account |
 
 Votes are read/write-hot state that has to be correct per-account, which git
-can't express. Post content is versioned prose with a review gate, which is
+can't express. Report content is versioned prose with a review gate, which is
 exactly what git is for. Mixing them — the earlier design recorded votes as
 `validations:` frontmatter via a bot commit — meant a ~2 minute delay per vote
 and no way to stop one person voting twice.
@@ -27,7 +27,7 @@ and no way to stop one person voting twice.
                     ┌────────────── votes: instant ──────────────┐
                     │                                            │
 Reader ──click──►  Cloudflare Worker  ──►  D1 (SQLite)
-       ◄── JSON ──  /api/votes             PRIMARY KEY (post_id, user_id)
+       ◄── JSON ──  /api/votes             PRIMARY KEY (report_id, user_id)
        │                                   └─ one vote per GitHub account
        └── GitHub OAuth ──► identity (login required to vote)
 
@@ -46,7 +46,7 @@ Everything lives in `worker/` — see `worker/README.md` for deploy steps and th
 endpoint table.
 
 - **One vote per user is a database constraint**, not application logic:
-  `PRIMARY KEY (post_id, user_id)` plus an UPSERT. Voting again *changes* your
+  `PRIMARY KEY (report_id, user_id)` plus an UPSERT. Voting again *changes* your
   verdict; it can never double-count. Clicking your current verdict retracts it.
 - **Immediacy** comes from two things: the count is fetched client-side on page
   load (`Cache-Control: no-store`, so Pages' static caching is irrelevant), and
@@ -65,7 +65,7 @@ endpoint table.
   the repo is no longer the single source of truth, in exchange for votes that
   actually work. The database is the record; back it up with
   `wrangler d1 export`.
-- **Degrading is quiet.** If the Worker is unreachable the post still renders
+- **Degrading is quiet.** If the Worker is unreachable the report still renders
   normally; only the counts fail, with a status message. A click retries once
   before giving up, so one flaky request can't lock a reader out of voting.
 
@@ -73,20 +73,20 @@ endpoint table.
 
 Unchanged, and entirely GitHub's:
 
-1. "Edit on GitHub" opens the web editor at the post's source file. For readers
+1. "Edit on GitHub" opens the web editor at the report's source file. For readers
    without write access GitHub forks the repo and opens a pull request on save.
 2. `.github/pull_request_template.md` asks the author to add themselves to the
-   post's `editors:` frontmatter **in the same PR**.
+   report's `editors:` frontmatter **in the same PR**.
 3. You review and merge. The push to `main` triggers `pages.yml`, Jekyll
    rebuilds, and both the edit and the new credit go live together.
 
-There is no automation anywhere in this path — no bot writes post content and no
-bot writes credits. The "Edited by" list at the bottom of a post is exactly the
+There is no automation anywhere in this path — no bot writes report content and no
+bot writes credits. The "Edited by" list at the bottom of a report is exactly the
 `editors:` block that a human wrote and a human merged, which is why it can be
 trusted at face value.
 
 `publish_to_patchbook.py` carries the `editors:` block forward when the pipeline
-republishes a post (`_existing_block`), so re-running the pipeline over a CVE
+republishes a report (`_existing_block`), so re-running the pipeline over a CVE
 never wipes contributor credits.
 
 ## Testing the parts that hide
@@ -118,7 +118,7 @@ Everything else is covered by `worker/test.mjs` (the API) and `test/ui.test.mjs`
 - `scripts/start_dev.sh` — brings the Worker and site up together for local work.
 - `assets/patchbook.js` — fetches/renders counts and the voter popover, casts
   votes, and builds the GitHub web-editor / suggestion-issue URLs.
-- `_layouts/post.html` — the vote bar, the popover markup, and the "Edited by"
+- `_layouts/report.html` — the vote bar, the popover markup, and the "Edited by"
   section rendered from `editors:` frontmatter.
 - `_config.yml` — `votes_api` (Worker URL; blank disables the vote UI) and
   `github_repo` / `github_branch` (feeds the edit links).
@@ -127,8 +127,8 @@ Everything else is covered by `worker/test.mjs` (the API) and `test/ui.test.mjs`
 
 ## Security model
 
-- **Vote endpoints treat everything as hostile.** Post ids are matched against
-  a strict `_posts/*.md` regex, verdicts against an allowlist, notes are
+- **Vote endpoints treat everything as hostile.** Report ids are matched against
+  a strict `_reports/*.md` regex, verdicts against an allowlist, notes are
   whitespace-collapsed and length-capped, and all writes are parameter-bound.
 - **`user_id`, not `login`, is the identity.** GitHub usernames can be changed
   and reused; the numeric id can't. `login` is refreshed on every vote so
@@ -142,7 +142,7 @@ Everything else is covered by `worker/test.mjs` (the API) and `test/ui.test.mjs`
   is HMAC-signed and expires in 10 minutes.
 - **The OAuth app requests no scopes and holds no repo access.** A leaked
   client secret cannot read or write this repo, cannot read a reader's private
-  data, and cannot mint a token with permissions the app never registered. Post
+  data, and cannot mint a token with permissions the app never registered. Report
   content changes through exactly one path: a pull request a human merges.
 - **Blast radius of a `TOKEN_SECRET` leak is vote fraud only** — forged sessions
   can cast votes and nothing else. Recovery is rotating the secret, which

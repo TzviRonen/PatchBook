@@ -1,14 +1,14 @@
 /* PatchBook vote API — Cloudflare Worker + D1.
  *
- * Why this exists: post *content* lives in git and changes only through merged
+ * Why this exists: report *content* lives in git and changes only through merged
  * pull requests, but votes need to be instant, capped at one per user, and
  * attributable by name. That's read/write-hot state, so it lives here instead
- * of in post frontmatter. See ARCHITECTURE.md.
+ * of in report frontmatter. See ARCHITECTURE.md.
  *
  * Endpoints
- *   GET    /api/votes?post=<path>   → { counts, voters, you }        (public)
+ *   GET    /api/votes?report=<path> → { counts, voters, you }        (public)
  *   POST   /api/vote                → cast/change a vote             (auth)
- *   DELETE /api/vote?post=<path>    → retract your vote              (auth)
+ *   DELETE /api/vote?report=<path>  → retract your vote              (auth)
  *   GET    /api/me                  → { login } for the current token
  *   GET    /auth/login?return=<url> → 302 to GitHub's consent screen
  *   GET    /auth/callback           → 302 back to <url>#pb_token=…
@@ -31,7 +31,7 @@ const GH_AUTH_BASE = (env) => env.GITHUB_AUTH_BASE || "https://github.com";
 const GH_API_BASE = (env) => env.GITHUB_API_BASE || "https://api.github.com";
 
 const VERDICTS = ["valid", "ai-slop"];
-const POST_RE = /^_posts\/[A-Za-z0-9._-]+\.md$/;
+const REPORT_RE = /^_reports\/[A-Za-z0-9._-]+\.md$/;
 const TOKEN_TTL = 60 * 60 * 24 * 30; // 30 days
 const STATE_TTL = 60 * 10; // 10 minutes to complete the OAuth round trip
 const NOTE_MAX = 500;
@@ -276,11 +276,11 @@ async function handleCallback(request, env) {
 
 /* ── votes ────────────────────────────────────────────────────────────── */
 
-async function readVotes(request, env, postId, me) {
+async function readVotes(request, env, reportId, me) {
   const { results } = await env.DB.prepare(
-    "SELECT login, verdict, note, updated_at, user_id FROM votes WHERE post_id = ? ORDER BY updated_at ASC"
+    "SELECT login, verdict, note, updated_at, user_id FROM votes WHERE report_id = ? ORDER BY updated_at ASC"
   )
-    .bind(postId)
+    .bind(reportId)
     .all();
 
   const rows = results || [];
@@ -289,7 +289,7 @@ async function readVotes(request, env, postId, me) {
 
   const mine = me ? rows.find((r) => r.user_id === me.id) : null;
   return {
-    post: postId,
+    report: reportId,
     counts,
     voters: rows.map((r) => ({
       login: r.login,
@@ -302,10 +302,10 @@ async function readVotes(request, env, postId, me) {
 }
 
 async function handleGetVotes(request, env) {
-  const postId = new URL(request.url).searchParams.get("post") || "";
-  if (!POST_RE.test(postId)) return json(request, env, { error: "bad post id" }, 400);
+  const reportId = new URL(request.url).searchParams.get("report") || "";
+  if (!REPORT_RE.test(reportId)) return json(request, env, { error: "bad report id" }, 400);
   const me = await currentUser(request, env); // optional — shapes `you` only
-  return json(request, env, await readVotes(request, env, postId, me));
+  return json(request, env, await readVotes(request, env, reportId, me));
 }
 
 async function handlePostVote(request, env) {
@@ -315,41 +315,41 @@ async function handlePostVote(request, env) {
   const body = await request.json().catch(() => null);
   if (!body) return json(request, env, { error: "bad body" }, 400);
 
-  const postId = String(body.post || "");
+  const reportId = String(body.report || "");
   const verdict = String(body.verdict || "");
-  if (!POST_RE.test(postId)) return json(request, env, { error: "bad post id" }, 400);
+  if (!REPORT_RE.test(reportId)) return json(request, env, { error: "bad report id" }, 400);
   if (!VERDICTS.includes(verdict)) return json(request, env, { error: "bad verdict" }, 400);
 
   const note = body.note ? String(body.note).replace(/\s+/g, " ").trim().slice(0, NOTE_MAX) : null;
 
-  // The (post_id, user_id) primary key is the one-vote-per-user rule: a repeat
+  // The (report_id, user_id) primary key is the one-vote-per-user rule: a repeat
   // vote overwrites the reader's previous verdict instead of adding to a tally.
   await env.DB.prepare(
-    `INSERT INTO votes (post_id, user_id, login, verdict, note)
+    `INSERT INTO votes (report_id, user_id, login, verdict, note)
      VALUES (?1, ?2, ?3, ?4, ?5)
-     ON CONFLICT (post_id, user_id) DO UPDATE SET
+     ON CONFLICT (report_id, user_id) DO UPDATE SET
        login      = excluded.login,
        verdict    = excluded.verdict,
        note       = excluded.note,
        updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')`
   )
-    .bind(postId, me.id, me.login, verdict, note)
+    .bind(reportId, me.id, me.login, verdict, note)
     .run();
 
-  return json(request, env, await readVotes(request, env, postId, me));
+  return json(request, env, await readVotes(request, env, reportId, me));
 }
 
 async function handleDeleteVote(request, env) {
   const me = await currentUser(request, env);
   if (!me) return json(request, env, { error: "login required" }, 401);
-  const postId = new URL(request.url).searchParams.get("post") || "";
-  if (!POST_RE.test(postId)) return json(request, env, { error: "bad post id" }, 400);
+  const reportId = new URL(request.url).searchParams.get("report") || "";
+  if (!REPORT_RE.test(reportId)) return json(request, env, { error: "bad report id" }, 400);
 
-  await env.DB.prepare("DELETE FROM votes WHERE post_id = ? AND user_id = ?")
-    .bind(postId, me.id)
+  await env.DB.prepare("DELETE FROM votes WHERE report_id = ? AND user_id = ?")
+    .bind(reportId, me.id)
     .run();
 
-  return json(request, env, await readVotes(request, env, postId, me));
+  return json(request, env, await readVotes(request, env, reportId, me));
 }
 
 /* ── router ───────────────────────────────────────────────────────────── */

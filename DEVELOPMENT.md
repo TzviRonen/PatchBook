@@ -7,7 +7,7 @@ PatchBook uses **Jekyll** as its production site generator (for GitHub Pages) bu
 - **Jekyll** is GitHub Pages' native build system. Pushing to `main` triggers an automatic build and deploy with no CI/CD configuration needed — that's why it was chosen over Hugo or a custom generator.
 - **Flask/serve.py** exists because this project's dev environment doesn't have Ruby, so `bundle exec jekyll serve` isn't available locally.
 
-The two renderers read the same `_posts/*.md` files and apply the same CSS (`assets/main.css`), so local preview is visually equivalent to production.
+The two renderers read the same `_reports/*.md` files and apply the same CSS (`assets/main.css`), so local preview is visually equivalent to production.
 
 ## Local preview
 
@@ -35,23 +35,23 @@ python patchbook/serve.py 4000    # or, from the parent root:
 2. GitHub Actions (`.github/workflows/pages.yml`) builds with Jekyll and deploys to `gh-pages`
 3. Enable GitHub Pages in repo Settings → Pages → Source: **GitHub Actions**
 
-## Adding posts
+## Adding reports
 
 Use the publish script from the parent repo:
 
 ```bash
-python publish_to_patchbook.py              # all posts from data/blogs/
+python publish_to_patchbook.py              # all reports from data/blogs/
 python publish_to_patchbook.py CVE-2024-30088   # one CVE
 python publish_to_patchbook.py --commit         # also git commit here
 ```
 
-Posts land in `_posts/YYYY-MM-DD-cve-XXXX-slug.md` with Jekyll-compatible YAML frontmatter.
+Reports land in `_reports/YYYY-MM-DD-cve-XXXX-slug.md` with Jekyll-compatible YAML frontmatter.
 
 ## Frontmatter fields
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `layout` | yes | always `post` |
+| `layout` | yes | always `report` |
 | `title` | yes | shown in card and `<title>` |
 | `date` | yes | `YYYY-MM-DD`, controls sort order |
 | `cve_id` | no | shown as blue badge |
@@ -137,6 +137,10 @@ depending purely on which URL you typed.
 **Sign-in fails after the GitHub consent screen.** The Worker prints the reason,
 including the exact `redirect_uri` it sent. Almost always the OAuth app's
 registered callback URL.
+
+**`no such column: report_id`.** The database predates the `post_id` → `report_id`
+rename and `schema.sql` cannot alter an existing table. Apply
+`worker/migrations/0001-post-id-to-report-id.sql`.
 
 **`no such table: votes` locally.** The local D1 is keyed by `database_id`, so
 editing `wrangler.toml` orphans it. `npm run db:local` recreates it; it is

@@ -1,7 +1,7 @@
 ---
 layout: default
 ---
-<div class="page page-post">
+<div class="page page-report">
   {%- comment -%}
     Two independent feedback channels, deliberately kept apart:
 
@@ -9,14 +9,14 @@ layout: default
       worker/. Counts render client-side from a live API call, so they appear
       immediately; one vote per GitHub account is enforced by the database. The
       list of who voted is fetched with the counts and shown only in the hover
-      popover on the count itself — never in the post body.
+      popover on the count itself — never in the report body.
     - Edit suggestions go through GitHub pull requests. They appear on the site
       only once a PR is merged. PR authors add themselves to the `editors:`
       frontmatter list in the same PR; nothing automated writes that block.
   {%- endcomment -%}
 
-  <div class="post-header">
-    <div class="post-header-meta">
+  <div class="report-header">
+    <div class="report-header-meta">
       <div class="flex-gap">
         {% if page.cve_id %}
           <span class="badge blue mono">{{ page.cve_id | escape }}</span>
@@ -35,13 +35,13 @@ layout: default
         {% endif %}
         <span class="muted small">{{ page.date | date: "%B %-d, %Y" }}</span>
       </div>
-      <a href="{{ '/' | relative_url }}" class="btn btn-muted back-link">← All posts</a>
+      <a href="{{ '/' | relative_url }}" class="btn btn-muted back-link">← All reports</a>
     </div>
 
-    <h1 class="post-title">{{ page.title | escape }}</h1>
+    <h1 class="report-title">{{ page.title | escape }}</h1>
 
     <div class="community community-bar"
-         data-post-path="{{ page.path | escape }}"
+         data-report-path="{{ page.path | escape }}"
          data-cve="{{ page.cve_id | escape }}"
          data-repo="{{ site.github_repo | escape }}"
          data-branch="{{ site.github_branch | escape }}"
@@ -52,7 +52,7 @@ layout: default
         button so the voter popover is reachable by keyboard and touch, not just
         hover.
       {%- endcomment -%}
-      <div class="votes" title="Reader fact-check of this AI-generated post">
+      <div class="votes" title="Reader fact-check of this AI-generated report">
         <span class="community-tally-label">Community check</span>
 
         {% assign vote_specs = "valid|Valid|green|✓,ai-slop|AI-slop|red|✗" | split: "," %}
@@ -87,8 +87,8 @@ layout: default
           <summary class="btn btn-muted">Suggest change</summary>
           <div class="community-form">
             <p class="muted small">
-              Posts here are AI-generated and may be wrong. Edit the source directly on
-              GitHub — saving opens a pull request. Add yourself to the post's
+              Reports here are AI-generated and may be wrong. Edit the source directly on
+              GitHub — saving opens a pull request. Add yourself to the report's
               <code>editors:</code> list in the same PR and your name will appear at the
               bottom once it's merged.
             </p>
@@ -106,8 +106,8 @@ layout: default
   </div>
 
   {%- comment -%}
-    Drop the leading <h1> kramdown renders from the post body's `# Title`
-    heading — the styled title already appears in .post-header above.
+    Drop the leading <h1> kramdown renders from the report body's `# Title`
+    heading — the styled title already appears in .report-header above.
   {%- endcomment -%}
   {%- assign _body = content -%}
   {%- assign _head = content | strip | slice: 0, 3 -%}
@@ -119,14 +119,14 @@ layout: default
   </article>
 
   {%- comment -%}
-    Editor credits. Maintained by hand: whoever opens a PR against this post
+    Editor credits. Maintained by hand: whoever opens a PR against this report
     adds their own entry to the `editors:` frontmatter block in that PR, so the
     credit is reviewed and merged along with the change it describes. Entries
     may be a bare GitHub username or a mapping with `name` plus optional `date`
     and `note`.
   {%- endcomment -%}
   {% if page.editors and page.editors.size > 0 %}
-  <section class="post-editors">
+  <section class="report-editors">
     <h2>Edited by</h2>
     <ul>
       {% for editor in page.editors %}

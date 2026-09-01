@@ -1,5 +1,5 @@
 title: PatchBook
-description: Windows kernel CVE analysis — binary diffs and patch breakdowns by the kernel-cve-pipeline
+description: Windows kernel CVE analysis — binary diffs and patch breakdowns
 url: "https://tzvironen.github.io"
 # Must match the repository name exactly — GitHub Pages serves a project site
 # at /<repo-name> and that path is case-sensitive. The repo is "PatchBook", so
@@ -31,7 +31,26 @@ plugins:
   - jekyll-feed
   - jekyll-seo-tag
 
-permalink: /posts/:slug/
+# Reports are a custom collection rather than Jekyll's built-in `posts`, so the
+# directory and the URLs both read "report". Two consequences of leaving
+# `_posts`: collections do not derive the date from the filename (every report
+# carries a `date:` in frontmatter, so that is covered) and they are not sorted
+# for you — see the explicit sort in _layouts/home.html.
+collections:
+  reports:
+    output: true
+    permalink: /reports/:slug/
+
+# jekyll-feed always emits a feed for site.posts, which is now permanently
+# empty. Park that at an unused path so it cannot win the /feed.xml filename,
+# and publish the reports feed there instead — /feed.xml is the URL readers and
+# aggregators already have. default.html links it explicitly rather than via
+# {% feed_meta %}, which would advertise the empty posts feed.
+feed:
+  path: /feed-unused.xml
+  collections:
+    reports:
+      path: /feed.xml
 
 exclude:
   - Gemfile

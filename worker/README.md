@@ -43,17 +43,33 @@ Then set `votes_api` in `../_config.yml` to the deployed Worker URL
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| `GET` | `/api/votes?post=<path>` | optional | counts + voter list (+ your own vote) |
+| `GET` | `/api/votes?report=<path>` | optional | counts + voter list (+ your own vote) |
 | `POST` | `/api/vote` | required | cast or change a vote |
-| `DELETE` | `/api/vote?post=<path>` | required | retract your vote |
+| `DELETE` | `/api/vote?report=<path>` | required | retract your vote |
 | `GET` | `/api/me` | optional | who the current token belongs to |
 | `GET` | `/auth/login?return=<url>` | — | start GitHub OAuth |
 | `GET` | `/auth/callback` | — | finish OAuth, redirect back with token in the URL fragment |
 
+## Migrations
+
+`schema.sql` uses `CREATE TABLE IF NOT EXISTS`, so it will not alter a table
+that already exists. Schema changes ship as numbered files in `migrations/`,
+applied by hand:
+
+```bash
+npx wrangler d1 execute patchbook --local --env dev --file=migrations/0001-post-id-to-report-id.sql
+npx wrangler d1 execute patchbook --remote           --file=migrations/0001-post-id-to-report-id.sql
+```
+
+`0001` renames `post_id` to `report_id` and rewrites existing `_posts/…` keys to
+`_reports/…`. **A database created before that rename will fail every query with
+"no such column: report_id" until it is applied** — re-running `schema.sql` is
+not enough.
+
 ## Design notes
 
 - **One vote per user** is a database constraint, not application logic:
-  `PRIMARY KEY (post_id, user_id)` plus an UPSERT. A second vote replaces the
+  `PRIMARY KEY (report_id, user_id)` plus an UPSERT. A second vote replaces the
   first; it can never double-count.
 - **`user_id`, not `login`, is the identity.** GitHub usernames can be changed
   and reused; the numeric id can't. `login` is refreshed on every vote so
