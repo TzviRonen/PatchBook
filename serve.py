@@ -322,7 +322,7 @@ PUBLISH_TPL = BASE.replace("{% block title %}Reports{% endblock %}", "Publish").
 <div class="page">
   <div class="page-header">
     <h1>Publish a report</h1>
-    <p>Analysed a Windows kernel patch? Fill this in and it becomes a pull request — reviewed before it goes live, like every other change here.</p>
+    <p>Analysed a Windows kernel patch? Fill this in and it becomes a pull request — reviewed before it goes live.</p>
   </div>
 
   <!-- .community carries repo/branch for the accessors in patchbook.js. No
