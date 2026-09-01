@@ -406,3 +406,226 @@ window.PatchBook = (function () {
     editOnGitHub: editOnGitHub,
   };
 })();
+
+/* PatchBook — report list filtering and the severity plot.
+ *
+ * Separate IIFE from the vote UI above: it runs on the Windows list page, the
+ * vote UI runs on a report page, and neither needs the other. No dependencies —
+ * the slider is two native range inputs and the chart is hand-built SVG.
+ */
+window.PatchBookReports = (function () {
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  var VIEW_W = 960, VIEW_H = 220;
+  var PAD = { top: 14, right: 16, bottom: 28, left: 34 };
+  var DAY = 86400000;
+
+  function el(name, attrs) {
+    var node = document.createElementNS(SVG_NS, name);
+    for (var k in attrs) if (attrs[k] != null) node.setAttribute(k, attrs[k]);
+    return node;
+  }
+
+  // "2026-08-29" → UTC midnight. Deliberately not `new Date(str)` for the
+  // whole value: local-timezone parsing shifts a date by a day either side of
+  // UTC, which visibly moves dots and silently changes filter results.
+  function parseDay(value) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+    return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : NaN;
+  }
+
+  function toISO(ms) {
+    return new Date(ms).toISOString().slice(0, 10);
+  }
+
+  function readCards(root) {
+    return [].slice.call(root.querySelectorAll(".report-card")).map(function (card) {
+      var cvss = card.dataset.cvss ? parseFloat(card.dataset.cvss) : null;
+      return {
+        card: card,
+        day: parseDay(card.dataset.date),
+        cvss: isNaN(cvss) ? null : cvss,
+        title: card.dataset.title || "",
+        href: card.getAttribute("href"),
+      };
+    }).filter(function (r) { return !isNaN(r.day); });
+  }
+
+  /* ── chart ──────────────────────────────────────────────────────────── */
+
+  function drawChart(figure, rows, from, to) {
+    var svg = figure.querySelector("[data-chart-svg]");
+    var note = figure.querySelector("[data-chart-note]");
+    var tip = figure.querySelector("[data-chart-tip]");
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    var scored = rows.filter(function (r) { return r.cvss !== null; });
+    var missing = rows.length - scored.length;
+
+    // Nothing to place on a severity axis — say so rather than drawing an
+    // empty grid that looks like a rendering failure.
+    if (!scored.length) {
+      figure.hidden = true;
+      return;
+    }
+    figure.hidden = false;
+
+    var x0 = PAD.left, x1 = VIEW_W - PAD.right;
+    var y0 = PAD.top, y1 = VIEW_H - PAD.bottom;
+    // A single report, or several on one day, would give a zero-width domain
+    // and put every dot on the left edge; pad it so they centre instead.
+    var span = to - from;
+    if (span <= 0) { from -= DAY; to += DAY; span = to - from; }
+
+    var xOf = function (day) { return x0 + ((day - from) / span) * (x1 - x0); };
+    var yOf = function (cvss) { return y1 - (cvss / 10) * (y1 - y0); };
+
+    // recessive hairline grid + severity ticks
+    [0, 2.5, 5, 7.5, 10].forEach(function (v) {
+      var y = yOf(v);
+      svg.appendChild(el("line", { x1: x0, y1: y, x2: x1, y2: y, class: "chart-grid" }));
+      var label = el("text", { x: x0 - 8, y: y + 4, "text-anchor": "end", class: "chart-axis-text" });
+      label.textContent = String(v);
+      svg.appendChild(label);
+    });
+
+    [from, to].forEach(function (day, i) {
+      var label = el("text", {
+        x: i === 0 ? x0 : x1, y: VIEW_H - 8,
+        "text-anchor": i === 0 ? "start" : "end", class: "chart-axis-text",
+      });
+      label.textContent = toISO(day);
+      svg.appendChild(label);
+    });
+
+    scored.forEach(function (r) {
+      var cx = xOf(r.day), cy = yOf(r.cvss);
+      // A real anchor: clicking opens the report and it is keyboard-reachable
+      // with no JS at all.
+      var a = el("a", { class: "chart-point", href: r.href, tabindex: "0" });
+      a.setAttribute("aria-label", r.title + ", CVSS " + r.cvss + ", " + toISO(r.day));
+      // Transparent hit circle first, so the target is ~24px rather than the
+      // 8px painted dot.
+      a.appendChild(el("circle", { cx: cx, cy: cy, r: 12, class: "chart-hit" }));
+      a.appendChild(el("circle", { cx: cx, cy: cy, r: 5, class: "chart-dot" }));
+
+      function show() {
+        tip.textContent = "";
+        var key = document.createElement("span");
+        key.className = "chart-tip-key";
+        var value = document.createElement("span");
+        value.className = "chart-tip-value";
+        value.textContent = "CVSS " + r.cvss;           // value leads
+        var label = document.createElement("span");
+        label.className = "chart-tip-label";
+        label.textContent = " · " + r.title + " · " + toISO(r.day);
+        tip.appendChild(key);
+        tip.appendChild(value);
+        tip.appendChild(label);                          // textContent, never innerHTML
+        tip.hidden = false;
+        tip.style.left = (cx / VIEW_W * 100) + "%";
+        tip.style.top = (cy / VIEW_H * 100) + "%";
+      }
+      function hide() { tip.hidden = true; }
+
+      a.addEventListener("mouseenter", show);
+      a.addEventListener("mouseleave", hide);
+      a.addEventListener("focus", show);   // same detail on keyboard focus
+      a.addEventListener("blur", hide);
+      svg.appendChild(a);
+    });
+
+    note.textContent = missing
+      ? scored.length + " scored · " + missing + " without a CVSS score, not plotted"
+      : scored.length + " report" + (scored.length === 1 ? "" : "s") + " in range";
+  }
+
+  /* ── filtering ──────────────────────────────────────────────────────── */
+
+  function init() {
+    var filter = document.querySelector("[data-report-filter]");
+    var list = document.querySelector("[data-report-list]");
+    if (!filter || !list) return;
+
+    var rows = readCards(list);
+    if (!rows.length) return;
+
+    var figure = document.querySelector("[data-severity-chart]");
+    var empty = document.querySelector("[data-filter-empty]");
+    var summary = filter.querySelector("[data-filter-summary]");
+    var fromInput = filter.querySelector("[data-filter-from]");
+    var toInput = filter.querySelector("[data-filter-to]");
+    var rangeFrom = filter.querySelector("[data-range-from]");
+    var rangeTo = filter.querySelector("[data-range-to]");
+    var rangeFill = filter.querySelector("[data-range-fill]");
+    var reset = filter.querySelector("[data-filter-reset]");
+
+    var days = rows.map(function (r) { return r.day; });
+    var minDay = Math.min.apply(null, days);
+    var maxDay = Math.max.apply(null, days);
+    var totalDays = Math.max(1, Math.round((maxDay - minDay) / DAY));
+
+    [fromInput, toInput].forEach(function (input) {
+      input.min = toISO(minDay);
+      input.max = toISO(maxDay);
+    });
+    // Sliders work in day offsets from the earliest report.
+    [rangeFrom, rangeTo].forEach(function (input) {
+      input.min = 0;
+      input.max = totalDays;
+      input.step = 1;
+    });
+
+    var from = minDay, to = maxDay;
+
+    function apply() {
+      var shown = 0;
+      rows.forEach(function (r) {
+        var visible = r.day >= from && r.day <= to;
+        r.card.hidden = !visible;
+        if (visible) shown++;
+      });
+
+      fromInput.value = toISO(from);
+      toInput.value = toISO(to);
+      rangeFrom.value = Math.round((from - minDay) / DAY);
+      rangeTo.value = Math.round((to - minDay) / DAY);
+
+      var a = (rangeFrom.value / totalDays) * 100;
+      var b = (rangeTo.value / totalDays) * 100;
+      rangeFill.style.left = a + "%";
+      rangeFill.style.width = Math.max(0, b - a) + "%";
+
+      summary.textContent = shown === rows.length
+        ? shown + " report" + (shown === 1 ? "" : "s")
+        : shown + " of " + rows.length + " reports";
+
+      if (empty) empty.hidden = shown !== 0;
+      drawChart(figure, rows.filter(function (r) { return !r.card.hidden; }), from, to);
+    }
+
+    function setFrom(day) { from = Math.min(Math.max(day, minDay), to); apply(); }
+    function setTo(day)   { to   = Math.max(Math.min(day, maxDay), from); apply(); }
+
+    fromInput.addEventListener("change", function () {
+      var d = parseDay(fromInput.value);
+      if (!isNaN(d)) setFrom(d); else apply();   // reject junk, restore the field
+    });
+    toInput.addEventListener("change", function () {
+      var d = parseDay(toInput.value);
+      if (!isNaN(d)) setTo(d); else apply();
+    });
+    rangeFrom.addEventListener("input", function () { setFrom(minDay + rangeFrom.value * DAY); });
+    rangeTo.addEventListener("input", function () { setTo(minDay + rangeTo.value * DAY); });
+    reset.addEventListener("click", function () { from = minDay; to = maxDay; apply(); });
+
+    apply();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+
+  return { init: init };
+})();

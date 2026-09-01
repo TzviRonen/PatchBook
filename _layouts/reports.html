@@ -1,0 +1,102 @@
+---
+layout: default
+---
+{%- comment -%}
+  Windows reports list: filter row, severity plot, then the cards.
+
+  Everything the filter and the chart need travels on data- attributes
+  (data-date, data-cvss) so patchbook.js never parses rendered text. Reports
+  without a `cvss` are still listed — they just can't be placed on a severity
+  axis, and the chart says how many it left out.
+{%- endcomment -%}
+{% assign reports = site.reports | sort: "date" | reverse %}
+
+<div class="page">
+  <div class="page-header">
+    <a class="back-link btn btn-muted" href="{{ '/' | relative_url }}">← All platforms</a>
+    <h1>Windows</h1>
+    <p>Deep-dives into Windows kernel patches — vulnerability reports with decompilations</p>
+  </div>
+
+  {% if reports.size == 0 %}
+  <div class="empty-state">
+    <div class="empty-icon">📭</div>
+    <p>No reports yet. Run the pipeline and publish.</p>
+  </div>
+  {% else %}
+
+  <section class="report-filter" data-report-filter>
+    <div class="filter-row">
+      <label class="filter-field">
+        <span>From</span>
+        <input type="date" data-filter-from>
+      </label>
+      <label class="filter-field">
+        <span>To</span>
+        <input type="date" data-filter-to>
+      </label>
+      <button type="button" class="btn btn-muted" data-filter-reset>Reset</button>
+      <span class="filter-summary" role="status" data-filter-summary></span>
+    </div>
+
+    {%- comment -%}
+      Two overlaid single-value sliders rather than one control: there is no
+      native two-handle range input, and this keeps both handles individually
+      focusable and announced. Values are day offsets, resolved against the
+      date bounds in JS.
+    {%- endcomment -%}
+    <div class="range-slider" data-range>
+      <div class="range-track" aria-hidden="true"><div class="range-fill" data-range-fill></div></div>
+      <input type="range" data-range-from aria-label="Range start">
+      <input type="range" data-range-to aria-label="Range end">
+    </div>
+  </section>
+
+  <figure class="severity-chart" data-severity-chart hidden>
+    <figcaption class="chart-title">Severity over time</figcaption>
+    <div class="chart-frame">
+      <svg viewBox="0 0 960 220" role="img"
+           aria-label="CVSS severity of each report against its publication date"
+           data-chart-svg></svg>
+      <div class="chart-tip" role="status" data-chart-tip hidden></div>
+    </div>
+    <figcaption class="chart-note" data-chart-note></figcaption>
+  </figure>
+
+  <div class="report-list" data-report-list>
+    {% for report in reports %}
+    <a class="report-card"
+       href="{{ report.url | relative_url }}"
+       data-date="{{ report.date | date: '%Y-%m-%d' }}"
+       {% if report.cvss %}data-cvss="{{ report.cvss }}"{% endif %}
+       data-title="{{ report.cve_id | default: report.title | escape }}">
+      <div class="report-card-meta">
+        <div class="flex-gap">
+          <span class="badge blue mono">{{ report.cve_id | default: report.title | escape }}</span>
+          {% if report.cvss %}
+            {% assign cvss = report.cvss | times: 1.0 %}
+            {% if cvss >= 9.0 %}{% assign sev = 'red' %}
+            {% elsif cvss >= 7.0 %}{% assign sev = 'orange' %}
+            {% elsif cvss >= 4.0 %}{% assign sev = 'yellow' %}
+            {% else %}{% assign sev = 'muted' %}{% endif %}
+            <span class="badge {{ sev }} severity-badge" title="CVSS base score">{{ report.cvss }}</span>
+          {% endif %}
+        </div>
+        <span class="report-date">{{ report.date | date: "%b %-d, %Y" }}</span>
+      </div>
+      <h2 class="report-card-title">{{ report.title | escape }}</h2>
+      {% if report.excerpt %}
+        <p class="report-card-excerpt">{{ report.excerpt | strip_html | truncate: 240 | escape }}</p>
+      {% endif %}
+      <span class="report-card-link">Read full report →</span>
+    </a>
+    {% endfor %}
+  </div>
+
+  <p class="empty-state filter-empty" data-filter-empty hidden>
+    No reports published in that date range.
+  </p>
+  {% endif %}
+</div>
+
+<script src="{{ "/assets/patchbook.js" | relative_url }}"></script>

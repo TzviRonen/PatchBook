@@ -55,8 +55,8 @@ Reports land in `_reports/YYYY-MM-DD-cve-XXXX-slug.md` with Jekyll-compatible YA
 | `title` | yes | shown in card and `<title>` |
 | `date` | yes | `YYYY-MM-DD`, controls sort order |
 | `cve_id` | no | shown as blue badge |
-| `cvss` | no | color-coded badge (red ≥9, orange ≥7, yellow ≥4) |
-| `excerpt` | no | shown on homepage card |
+| `cvss` | no | severity badge (red ≥9, orange ≥7, yellow ≥4) and the y-value on the severity plot; a report without it is listed but not plotted |
+| `excerpt` | no | shown on the report card |
 | `editors` | no | "Edited by" credits; added by PR authors themselves, never generated |
 
 Votes are **not** frontmatter — they live in the database behind `worker/`. See
@@ -64,7 +64,7 @@ Votes are **not** frontmatter — they live in the database behind `worker/`. Se
 
 ## Tests
 
-Three suites. The first two need nothing installed and no network:
+Four suites. The first two need nothing installed and no network:
 
 ```bash
 node worker/test.mjs         # 23 — auth, one-vote-per-user, input validation,
@@ -73,10 +73,15 @@ node worker/test_oauth.mjs   # 25 — the whole OAuth round trip against a
                              #      GitHub double: login → consent → callback →
                              #      code exchange → identity → session → vote
 
-python3 serve.py 3004 &      # 27 — counts, voter popover, optimistic updates,
+python3 serve.py 3004 &      # 30 — counts, voter popover, optimistic updates,
 npm install jsdom            #      offline recovery. Rewrites the page's
 node test/ui.test.mjs        #      data-api to its own stub, so it does not
                              #      care what votes_api is set to.
+
+node test/reports.test.mjs   # 23 — date filter, range slider, severity plot.
+                             #      Writes fixture reports into _reports/ for
+                             #      the run and removes them on exit, so the
+                             #      filter is exercised with real spread.
 ```
 
 `test_oauth.mjs` exists because `handleCallback` is otherwise unreachable

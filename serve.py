@@ -130,12 +130,13 @@ BASE = """<!DOCTYPE html>
 <footer>
   <div class="footer-inner">
     <span>PatchBook — Windows kernel CVE analysis</span>
-    <span>Windows kernel patch analysis</span>
+    <span>AI-drafted, community-corrected</span>
   </div>
 </footer>
 </body>
 </html>"""
 
+# Category chooser — mirrors _layouts/home.html.
 HOME_TPL = BASE.replace("{% block title %}Reports{% endblock %}", "Reports").replace(
     "{% block body %}{% endblock %}", """
 <div class="page">
@@ -143,14 +144,72 @@ HOME_TPL = BASE.replace("{% block title %}Reports{% endblock %}", "Reports").rep
     <h1>CVE Analysis Reports</h1>
     <p>Deep-dives into Windows kernel patches — vulnerability reports with decompilations</p>
   </div>
+  <div class="category-grid">
+    <a class="category-tile category-windows" href="/windows/">
+      <span class="category-art" aria-hidden="true">
+        <span class="win-pane"></span><span class="win-pane"></span>
+        <span class="win-pane"></span><span class="win-pane"></span>
+      </span>
+      <span class="category-body">
+        <span class="category-name">Windows</span>
+        <span class="category-count">{{ reports|length }} report{% if reports|length != 1 %}s{% endif %}</span>
+      </span>
+    </a>
+    <div class="category-tile category-soon" aria-disabled="true">
+      <span class="category-body">
+        <span class="category-name">More soon</span>
+        <span class="category-count">Other platforms are not covered yet</span>
+      </span>
+    </div>
+  </div>
+</div>
+""")
+
+# Windows report list — mirrors _layouts/reports.html.
+REPORTS_TPL = BASE.replace("{% block title %}Reports{% endblock %}", "Windows").replace(
+    "{% block body %}{% endblock %}", """
+<div class="page">
+  <div class="page-header">
+    <a class="back-link btn btn-muted" href="/">← All platforms</a>
+    <h1>Windows</h1>
+    <p>Deep-dives into Windows kernel patches — vulnerability reports with decompilations</p>
+  </div>
   {% if reports %}
-  <div class="report-list">
+  <section class="report-filter" data-report-filter>
+    <div class="filter-row">
+      <label class="filter-field"><span>From</span><input type="date" data-filter-from></label>
+      <label class="filter-field"><span>To</span><input type="date" data-filter-to></label>
+      <button type="button" class="btn btn-muted" data-filter-reset>Reset</button>
+      <span class="filter-summary" role="status" data-filter-summary></span>
+    </div>
+    <div class="range-slider" data-range>
+      <div class="range-track" aria-hidden="true"><div class="range-fill" data-range-fill></div></div>
+      <input type="range" data-range-from aria-label="Range start">
+      <input type="range" data-range-to aria-label="Range end">
+    </div>
+  </section>
+
+  <figure class="severity-chart" data-severity-chart hidden>
+    <figcaption class="chart-title">Severity over time</figcaption>
+    <div class="chart-frame">
+      <svg viewBox="0 0 960 220" role="img"
+           aria-label="CVSS severity of each report against its publication date"
+           data-chart-svg></svg>
+      <div class="chart-tip" role="status" data-chart-tip hidden></div>
+    </div>
+    <figcaption class="chart-note" data-chart-note></figcaption>
+  </figure>
+
+  <div class="report-list" data-report-list>
     {% for p in reports %}
-    <a class="report-card" href="/reports/{{ p._slug }}">
+    <a class="report-card" href="/reports/{{ p._slug }}"
+       data-date="{{ p.date }}"
+       {% if p.cvss %}data-cvss="{{ p.cvss }}"{% endif %}
+       data-title="{{ p.cve_id or p.title }}">
       <div class="report-card-meta">
         <div class="flex-gap">
           {% if p.cve_id %}<span class="badge blue mono">{{ p.cve_id }}</span>{% endif %}
-          {% if p.cvss %}<span class="badge {{ cvss_class(p.cvss) }}">CVSS {{ p.cvss }}</span>{% endif %}
+          {% if p.cvss %}<span class="badge {{ cvss_class(p.cvss) }} severity-badge" title="CVSS base score">{{ p.cvss }}</span>{% endif %}
         </div>
         <span class="report-date">{{ p.date }}</span>
       </div>
@@ -160,6 +219,7 @@ HOME_TPL = BASE.replace("{% block title %}Reports{% endblock %}", "Reports").rep
     </a>
     {% endfor %}
   </div>
+  <p class="empty-state filter-empty" data-filter-empty hidden>No reports published in that date range.</p>
   {% else %}
   <div class="empty-state"><div class="empty-icon">📭</div><p>No reports yet.</p></div>
   {% endif %}
@@ -275,6 +335,13 @@ def home():
     return render_template_string(HOME_TPL, reports=reports, css=CSS,
                                   active="home", cvss_class=_cvss_class,
                                   strip_md=_strip_md)
+
+
+@app.route("/windows/")
+def windows():
+    return render_template_string(REPORTS_TPL, reports=_all_reports(), css=CSS,
+                                  active="home", cvss_class=_cvss_class,
+                                  strip_md=_strip_md, site=_site_config())
 
 
 @app.route("/reports/<slug>")

@@ -105,20 +105,24 @@ some point *because* they were hard to test:
   an open redirect that leaks session tokens, so `worker/test.mjs` pins it:
   production must be a single HTTPS origin, with no wildcard and no localhost.
 
-Everything else is covered by `worker/test.mjs` (the API) and `test/ui.test.mjs`
-(the front end, against a stub). See `DEVELOPMENT.md`.
+Everything else is covered by `worker/test.mjs` (the API), `test/ui.test.mjs`
+(the vote UI, against a stub) and `test/reports.test.mjs` (the filter and plot,
+against fixture reports it writes and removes itself). See `DEVELOPMENT.md`.
 
 ## Where each piece lives
 
 - `worker/src/index.js` — vote API and OAuth. Runs on Cloudflare, not GitHub.
 - `worker/schema.sql` — the vote table and its one-vote-per-user key.
-- `worker/test.mjs`, `worker/test_oauth.mjs`, `test/ui.test.mjs` — the three
-  suites; none are deployed or published.
+- `worker/test.mjs`, `worker/test_oauth.mjs`, `test/ui.test.mjs`,
+  `test/reports.test.mjs` — the four suites; none are deployed or published.
 - `scripts/start_dev.sh` — brings the Worker and site up together for local work.
 - `assets/patchbook.js` — fetches/renders counts and the voter popover, casts
   votes, and builds the GitHub web-editor / suggestion-issue URLs.
 - `_layouts/report.html` — the vote bar, the popover markup, and the "Edited by"
   section rendered from `editors:` frontmatter.
+- `_layouts/home.html` — the platform chooser; `_layouts/reports.html` — the
+  Windows list with its date filter and severity plot. The filter and chart read
+  `data-date` / `data-cvss` off each card, so the JS never parses rendered text.
 - `_config.yml` — `votes_api` (Worker URL; blank disables the vote UI) and
   `github_repo` / `github_branch` (feeds the edit links).
 - `.github/workflows/pages.yml` — Jekyll build + Pages deploy on push to `main`.

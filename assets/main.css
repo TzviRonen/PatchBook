@@ -601,3 +601,184 @@ footer {
   .report-title { font-size: 1.4rem; }
   .footer-inner { flex-direction: column; text-align: center; }
 }
+
+/* ── category chooser ── */
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.category-tile {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  color: inherit;
+  min-height: 116px;
+}
+a.category-tile { transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s; }
+a.category-tile:hover {
+  border-color: var(--blue-border);
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+.category-body { display: flex; flex-direction: column; gap: 0.2rem; }
+.category-name { font-size: 1.15rem; font-weight: 700; }
+.category-count { font-size: 0.85rem; color: var(--muted); }
+
+/* The Windows motif: four panes on a blue field, drawn rather than fetched.
+   The slight skew reads as the logo's perspective without imitating it. */
+.category-art {
+  flex-shrink: 0;
+  width: 68px; height: 68px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, var(--blue) 0%, #0b52a8 100%);
+  transform: skewX(-6deg);
+}
+.win-pane { background: #fff; border-radius: 2px; opacity: 0.94; }
+
+/* Not selectable: no link, no focus, and visibly recessive. */
+.category-soon {
+  background: var(--bg2);
+  border-style: dashed;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.category-soon .category-name { color: var(--muted); }
+.category-soon .category-count { color: var(--muted2); }
+
+/* ── filter row ── */
+.report-filter {
+  margin-bottom: 1.25rem;
+  padding: 0.9rem 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.filter-row {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.filter-field { display: flex; flex-direction: column; gap: 0.25rem; }
+.filter-field > span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.filter-field input {
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.32rem 0.5rem;
+}
+.filter-field input:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.filter-summary { margin-left: auto; font-size: 0.85rem; color: var(--muted); }
+
+/* Two overlaid single-value sliders — there is no native two-handle range
+   input. Only the thumbs take pointer events so the lower track stays clickable
+   by neither, which keeps the two handles from fighting. */
+.range-slider { position: relative; height: 34px; margin-top: 0.9rem; }
+.range-track {
+  position: absolute; top: 15px; left: 0; right: 0; height: 4px;
+  background: var(--bg3); border-radius: 999px;
+}
+.range-fill { position: absolute; top: 0; height: 100%; background: var(--blue); border-radius: 999px; }
+.range-slider input[type="range"] {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 34px; margin: 0;
+  background: none; -webkit-appearance: none; appearance: none;
+  pointer-events: none;
+}
+.range-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--bg); border: 2px solid var(--blue);
+  box-shadow: var(--shadow-sm); cursor: grab; pointer-events: auto;
+}
+.range-slider input[type="range"]::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--bg); border: 2px solid var(--blue);
+  box-shadow: var(--shadow-sm); cursor: grab; pointer-events: auto;
+}
+.range-slider input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--blue); outline-offset: 2px; }
+.range-slider input[type="range"]:focus-visible::-moz-range-thumb { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+/* ── severity chart ── */
+.severity-chart {
+  margin: 0 0 1.25rem;
+  padding: 0.9rem 1rem 0.6rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.chart-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.4rem;
+}
+.chart-frame { position: relative; }
+/* Scale uniformly: preserveAspectRatio="none" (or a fixed height with a
+   percentage width) stretches the dots into ovals at any width but 960×220. */
+.severity-chart svg { display: block; width: 100%; height: auto; }
+.chart-note { margin-top: 0.35rem; font-size: 0.8rem; color: var(--muted); }
+
+/* recessive grid: hairline, solid, one step off the surface */
+.chart-grid { stroke: var(--border-soft); stroke-width: 1; }
+.chart-axis-text { fill: var(--muted); font-size: 11px; font-family: var(--font-ui); }
+
+/* One hue for every dot: y-position already encodes severity, and severity-
+   banded fills fail CVD separation (orange/yellow ΔE 0.4 under deuteranopia).
+   The 2px surface ring keeps overlapping dots legible. */
+.chart-dot { fill: var(--blue); stroke: var(--bg); stroke-width: 2; }
+.chart-hit { fill: transparent; cursor: pointer; }
+.chart-point:hover .chart-dot,
+.chart-point:focus-visible .chart-dot { fill: #0b52a8; }
+.chart-point:focus-visible { outline: none; }
+.chart-point:focus-visible .chart-hit { stroke: var(--blue); stroke-width: 2; }
+
+.chart-tip {
+  position: absolute;
+  z-index: 10;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+/* value leads, label follows */
+.chart-tip-value { font-weight: 700; font-family: var(--font-mono); }
+.chart-tip-label { color: var(--muted); }
+.chart-tip-key {
+  display: inline-block; width: 12px; height: 2px;
+  background: var(--blue); vertical-align: middle; margin-right: 0.35rem;
+}
+
+.severity-badge { font-family: var(--font-mono); }
+.filter-empty { display: none; }
+.filter-empty:not([hidden]) { display: block; }

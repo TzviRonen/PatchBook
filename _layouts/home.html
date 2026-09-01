@@ -1,55 +1,40 @@
 ---
 layout: default
 ---
+{%- comment -%}
+  Category chooser. Windows is the only populated platform today; the second
+  tile is a deliberate placeholder so the grid reads as "more coming" rather
+  than as a lone orphaned card.
+{%- endcomment -%}
 <div class="page">
   <div class="page-header">
     <h1>CVE Analysis Reports</h1>
     <p>Deep-dives into Windows kernel patches — vulnerability reports with decompilations</p>
   </div>
 
-  {%- comment -%}
-    Collections are not date-sorted for you the way site.posts is, so sort
-    explicitly. Newest first.
-  {%- endcomment -%}
-  {% assign reports = site.reports | sort: "date" | reverse %}
-
-  {% if reports.size == 0 %}
-  <div class="empty-state">
-    <div class="empty-icon">📭</div>
-    <p>No reports yet. Run the pipeline and publish.</p>
-  </div>
-  {% else %}
-  <div class="report-list">
-    {% for report in reports %}
-    <a class="report-card" href="{{ report.url | relative_url }}">
-      <div class="report-card-meta">
-        <div class="flex-gap">
-          <span class="badge blue mono">{{ report.cve_id | default: report.title | escape }}</span>
-          {% if report.cvss %}
-            {% assign cvss = report.cvss | times: 1.0 %}
-            {% if cvss >= 9.0 %}
-              <span class="badge red">CVSS {{ report.cvss }}</span>
-            {% elsif cvss >= 7.0 %}
-              <span class="badge orange">CVSS {{ report.cvss }}</span>
-            {% elsif cvss >= 4.0 %}
-              <span class="badge yellow">CVSS {{ report.cvss }}</span>
-            {% else %}
-              <span class="badge muted">CVSS {{ report.cvss }}</span>
-            {% endif %}
-          {% endif %}
-        </div>
-        <span class="report-date">{{ report.date | date: "%b %-d, %Y" }}</span>
-      </div>
-      <h2 class="report-card-title">{{ report.title | escape }}</h2>
-      {% if report.subtitle %}
-        <p class="report-card-subtitle">{{ report.subtitle | escape }}</p>
-      {% endif %}
-      {% if report.excerpt %}
-        <p class="report-card-excerpt">{{ report.excerpt | strip_html | truncate: 240 | escape }}</p>
-      {% endif %}
-      <span class="report-card-link">Read full report →</span>
+  <div class="category-grid">
+    <a class="category-tile category-windows" href="{{ '/windows/' | relative_url }}">
+      {%- comment -%}
+        Four-pane Windows motif, drawn in CSS — no image asset, no request.
+        aria-hidden because the tile's own text already names the platform.
+      {%- endcomment -%}
+      <span class="category-art" aria-hidden="true">
+        <span class="win-pane"></span><span class="win-pane"></span>
+        <span class="win-pane"></span><span class="win-pane"></span>
+      </span>
+      <span class="category-body">
+        <span class="category-name">Windows</span>
+        <span class="category-count">
+          {{ site.reports | size }} report{% if site.reports.size != 1 %}s{% endif %}
+        </span>
+      </span>
     </a>
-    {% endfor %}
+
+    <div class="category-tile category-soon" aria-disabled="true">
+      <span class="category-body">
+        <span class="category-name">More soon</span>
+        <span class="category-count">Other platforms are not covered yet</span>
+      </span>
+    </div>
   </div>
-  {% endif %}
 </div>
