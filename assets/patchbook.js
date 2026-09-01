@@ -936,8 +936,7 @@ window.PatchBookPublish = (function () {
     var area = root.querySelector("[data-publish-file]");
     var open = root.querySelector("[data-publish-open]");
     var download = root.querySelector("[data-publish-download]");
-    var button = root.querySelector("[data-publish-submit]");
-
+    
     // The panel is populated before the clipboard is even attempted, so the
     // reader's work is recoverable no matter what happens next.
     area.value = file;
@@ -945,10 +944,9 @@ window.PatchBookPublish = (function () {
     download.href = URL.createObjectURL(new Blob([file], { type: "text/markdown" }));
     download.setAttribute("download", filename.replace(/^_reports\//, ""));
     output.hidden = false;
-    button.textContent = "Regenerate & copy again";
 
     function copied() {
-      status.textContent = "Copied. Paste it into the GitHub editor that just opened, then press “Propose new file”.";
+      status.textContent = "Paste this report into the GitHub editor, then press commit.";
       window.open(open.href, "_blank", "noopener");
     }
     function manual() {

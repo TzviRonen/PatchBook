@@ -76,7 +76,8 @@ permalink: /publish/
       <p class="publish-error" role="alert" data-publish-error hidden></p>
 
       <div class="publish-actions">
-        <button type="submit" class="btn btn-blue" data-publish-submit>Publish report →</button>
+        <button type="submit" class="btn btn-blue" data-publish-submit>Generate, Copy &amp; Open Github PR</button>
+        <span class="publish-hint">Paste this report into the GitHub editor, then press commit</span>
         <span class="muted small" data-publish-filename></span>
       </div>
     </form>

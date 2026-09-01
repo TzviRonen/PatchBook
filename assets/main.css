@@ -881,3 +881,4 @@ a.category-tile:hover {
   resize: vertical;
 }
 .publish-output[hidden] { display: none; }
+.publish-hint { font-size: 0.85rem; color: var(--muted); }
