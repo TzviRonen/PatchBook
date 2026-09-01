@@ -40,15 +40,24 @@ layout: default
     </div>
 
     {%- comment -%}
-      Two overlaid single-value sliders rather than one control: there is no
-      native two-handle range input, and this keeps both handles individually
-      focusable and announced. Values are day offsets, resolved against the
-      date bounds in JS.
+      One track, two draggable handles. A native range input holds one value,
+      and two overlaid inputs fight for the pointer where the thumbs meet, so
+      this is a plain pointer/keyboard slider. Each handle is a real button with
+      role="slider", so arrow keys, Home and End work and a screen reader
+      announces the date rather than an offset.
     {%- endcomment -%}
     <div class="range-slider" data-range>
-      <div class="range-track" aria-hidden="true"><div class="range-fill" data-range-fill></div></div>
-      <input type="range" data-range-from aria-label="Range start">
-      <input type="range" data-range-to aria-label="Range end">
+      <div class="range-track" data-range-track>
+        <div class="range-fill" data-range-fill></div>
+      </div>
+      <button type="button" class="range-handle" data-range-handle="from"
+              role="slider" aria-label="Range start" tabindex="0"></button>
+      <button type="button" class="range-handle" data-range-handle="to"
+              role="slider" aria-label="Range end" tabindex="0"></button>
+    </div>
+    <div class="range-ends">
+      <span data-range-min></span>
+      <span data-range-max></span>
     </div>
   </section>
 

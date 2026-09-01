@@ -183,10 +183,13 @@ REPORTS_TPL = BASE.replace("{% block title %}Reports{% endblock %}", "Windows").
       <span class="filter-summary" role="status" data-filter-summary></span>
     </div>
     <div class="range-slider" data-range>
-      <div class="range-track" aria-hidden="true"><div class="range-fill" data-range-fill></div></div>
-      <input type="range" data-range-from aria-label="Range start">
-      <input type="range" data-range-to aria-label="Range end">
+      <div class="range-track" data-range-track><div class="range-fill" data-range-fill></div></div>
+      <button type="button" class="range-handle" data-range-handle="from"
+              role="slider" aria-label="Range start" tabindex="0"></button>
+      <button type="button" class="range-handle" data-range-handle="to"
+              role="slider" aria-label="Range end" tabindex="0"></button>
     </div>
+    <div class="range-ends"><span data-range-min></span><span data-range-max></span></div>
   </section>
 
   <figure class="severity-chart" data-severity-chart hidden>
@@ -224,6 +227,7 @@ REPORTS_TPL = BASE.replace("{% block title %}Reports{% endblock %}", "Windows").
   <div class="empty-state"><div class="empty-icon">📭</div><p>No reports yet.</p></div>
   {% endif %}
 </div>
+<script src="/assets/patchbook.js"></script>
 """)
 
 REPORT_TPL = BASE.replace("{% block title %}Reports{% endblock %}", "{{ report.title }}").replace(

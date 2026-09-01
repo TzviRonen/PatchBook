@@ -114,7 +114,8 @@ against fixture reports it writes and removes itself). See `DEVELOPMENT.md`.
 - `worker/src/index.js` — vote API and OAuth. Runs on Cloudflare, not GitHub.
 - `worker/schema.sql` — the vote table and its one-vote-per-user key.
 - `worker/test.mjs`, `worker/test_oauth.mjs`, `test/ui.test.mjs`,
-  `test/reports.test.mjs` — the four suites; none are deployed or published.
+  `test/reports.test.mjs`, `test/browser.test.mjs` — the five suites; none are
+  deployed or published.
 - `scripts/start_dev.sh` — brings the Worker and site up together for local work.
 - `assets/patchbook.js` — fetches/renders counts and the voter popover, casts
   votes, and builds the GitHub web-editor / suggestion-issue URLs.

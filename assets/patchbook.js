@@ -541,6 +541,16 @@ window.PatchBookReports = (function () {
 
   /* ── filtering ──────────────────────────────────────────────────────── */
 
+  // The range opens on the current year rather than on the data's own extent:
+  // "everything published this year, up to today" is the question a reader
+  // actually arrives with.
+  var DEFAULT_START = Date.UTC(2026, 0, 1);
+
+  function todayUTC() {
+    var n = new Date();
+    return Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
+  }
+
   function init() {
     var filter = document.querySelector("[data-report-filter]");
     var list = document.querySelector("[data-report-list]");
@@ -554,28 +564,36 @@ window.PatchBookReports = (function () {
     var summary = filter.querySelector("[data-filter-summary]");
     var fromInput = filter.querySelector("[data-filter-from]");
     var toInput = filter.querySelector("[data-filter-to]");
-    var rangeFrom = filter.querySelector("[data-range-from]");
-    var rangeTo = filter.querySelector("[data-range-to]");
-    var rangeFill = filter.querySelector("[data-range-fill]");
+    var track = filter.querySelector("[data-range-track]");
+    var fill = filter.querySelector("[data-range-fill]");
+    var handleFrom = filter.querySelector('[data-range-handle="from"]');
+    var handleTo = filter.querySelector('[data-range-handle="to"]');
     var reset = filter.querySelector("[data-filter-reset]");
+    var endMin = filter.querySelector("[data-range-min]");
+    var endMax = filter.querySelector("[data-range-max]");
 
     var days = rows.map(function (r) { return r.day; });
-    var minDay = Math.min.apply(null, days);
-    var maxDay = Math.max.apply(null, days);
-    var totalDays = Math.max(1, Math.round((maxDay - minDay) / DAY));
+    // The domain has to cover both the default window and anything published
+    // outside it, or a report would exist that the slider cannot reach.
+    var minDay = Math.min.apply(null, days.concat([DEFAULT_START]));
+    var maxDay = Math.max.apply(null, days.concat([todayUTC()]));
+
+    var from = Math.max(DEFAULT_START, minDay);
+    var to = Math.min(todayUTC(), maxDay);
+    if (to < from) { from = minDay; to = maxDay; }
 
     [fromInput, toInput].forEach(function (input) {
       input.min = toISO(minDay);
       input.max = toISO(maxDay);
     });
-    // Sliders work in day offsets from the earliest report.
-    [rangeFrom, rangeTo].forEach(function (input) {
-      input.min = 0;
-      input.max = totalDays;
-      input.step = 1;
-    });
+    if (endMin) endMin.textContent = toISO(minDay);
+    if (endMax) endMax.textContent = toISO(maxDay);
 
-    var from = minDay, to = maxDay;
+    var span = Math.max(1, maxDay - minDay);
+    var ratio = function (day) { return (day - minDay) / span; };
+    var dayAt = function (fraction) {
+      return minDay + Math.round((fraction * span) / DAY) * DAY;
+    };
 
     function apply() {
       var shown = 0;
@@ -587,24 +605,91 @@ window.PatchBookReports = (function () {
 
       fromInput.value = toISO(from);
       toInput.value = toISO(to);
-      rangeFrom.value = Math.round((from - minDay) / DAY);
-      rangeTo.value = Math.round((to - minDay) / DAY);
 
-      var a = (rangeFrom.value / totalDays) * 100;
-      var b = (rangeTo.value / totalDays) * 100;
-      rangeFill.style.left = a + "%";
-      rangeFill.style.width = Math.max(0, b - a) + "%";
+      var a = ratio(from) * 100, b = ratio(to) * 100;
+      handleFrom.style.left = a + "%";
+      handleTo.style.left = b + "%";
+      fill.style.left = a + "%";
+      fill.style.width = Math.max(0, b - a) + "%";
+
+      [[handleFrom, from], [handleTo, to]].forEach(function (pair) {
+        pair[0].setAttribute("aria-valuemin", toISO(minDay));
+        pair[0].setAttribute("aria-valuemax", toISO(maxDay));
+        pair[0].setAttribute("aria-valuenow", toISO(pair[1]));
+        pair[0].setAttribute("aria-valuetext", toISO(pair[1]));
+      });
 
       summary.textContent = shown === rows.length
         ? shown + " report" + (shown === 1 ? "" : "s")
         : shown + " of " + rows.length + " reports";
 
       if (empty) empty.hidden = shown !== 0;
+      // The plot always reflects the current range — same call site as the list.
       drawChart(figure, rows.filter(function (r) { return !r.card.hidden; }), from, to);
     }
 
     function setFrom(day) { from = Math.min(Math.max(day, minDay), to); apply(); }
     function setTo(day)   { to   = Math.max(Math.min(day, maxDay), from); apply(); }
+
+    /* dragging ------------------------------------------------------------ */
+
+    function dayFromClientX(clientX) {
+      var box = track.getBoundingClientRect();
+      if (!box.width) return null;
+      var fraction = (clientX - box.left) / box.width;
+      return dayAt(Math.min(1, Math.max(0, fraction)));
+    }
+
+    function drag(handle, setter) {
+      handle.addEventListener("pointerdown", function (e) {
+        e.preventDefault();
+        handle.setPointerCapture(e.pointerId);   // keep tracking outside the track
+        handle.classList.add("is-dragging");
+      });
+      handle.addEventListener("pointermove", function (e) {
+        if (!handle.hasPointerCapture(e.pointerId)) return;
+        var day = dayFromClientX(e.clientX);
+        if (day !== null) setter(day);
+      });
+      ["pointerup", "pointercancel"].forEach(function (type) {
+        handle.addEventListener(type, function (e) {
+          handle.classList.remove("is-dragging");
+          if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId);
+        });
+      });
+    }
+    drag(handleFrom, setFrom);
+    drag(handleTo, setTo);
+
+    // Clicking the line jumps whichever end is nearer, so the whole track is
+    // usable and not just the two 16px circles.
+    track.addEventListener("pointerdown", function (e) {
+      var day = dayFromClientX(e.clientX);
+      if (day === null) return;
+      if (Math.abs(day - from) <= Math.abs(day - to)) setFrom(day); else setTo(day);
+    });
+
+    /* keyboard ------------------------------------------------------------ */
+
+    function keys(handle, get, setter) {
+      handle.addEventListener("keydown", function (e) {
+        var step = e.shiftKey ? 7 : 1;
+        var day = get();
+        if (e.key === "ArrowLeft" || e.key === "ArrowDown") day -= step * DAY;
+        else if (e.key === "ArrowRight" || e.key === "ArrowUp") day += step * DAY;
+        else if (e.key === "PageDown") day -= 30 * DAY;
+        else if (e.key === "PageUp") day += 30 * DAY;
+        else if (e.key === "Home") day = minDay;
+        else if (e.key === "End") day = maxDay;
+        else return;
+        e.preventDefault();
+        setter(day);
+      });
+    }
+    keys(handleFrom, function () { return from; }, setFrom);
+    keys(handleTo, function () { return to; }, setTo);
+
+    /* typed dates stay available as the precise, accessible fallback ------- */
 
     fromInput.addEventListener("change", function () {
       var d = parseDay(fromInput.value);
@@ -614,9 +699,12 @@ window.PatchBookReports = (function () {
       var d = parseDay(toInput.value);
       if (!isNaN(d)) setTo(d); else apply();
     });
-    rangeFrom.addEventListener("input", function () { setFrom(minDay + rangeFrom.value * DAY); });
-    rangeTo.addEventListener("input", function () { setTo(minDay + rangeTo.value * DAY); });
-    reset.addEventListener("click", function () { from = minDay; to = maxDay; apply(); });
+
+    reset.addEventListener("click", function () {
+      from = Math.max(DEFAULT_START, minDay);
+      to = Math.min(todayUTC(), maxDay);
+      apply();
+    });
 
     apply();
   }

@@ -59,7 +59,10 @@ const shown=()=>cards().filter(c=>!c.hidden).length;
 const dots=()=>w.document.querySelectorAll(".chart-point").length;
 
 ok("all 9 reports listed initially", cards().length===9, cards().length);
-ok("all visible before filtering", shown()===9, shown());
+ok("default range is Jan 1 → today", $("[data-filter-from]").value==="2026-01-01" &&
+   $("[data-filter-to]").value===new Date().toISOString().slice(0,10),
+   $("[data-filter-from]").value+" → "+$("[data-filter-to]").value);
+ok("every fixture falls inside the default range", shown()===9, shown());
 ok("chart is visible", !$("[data-severity-chart]").hidden);
 ok("8 dots — the unscored report is not plotted", dots()===8, dots());
 ok("note counts the unscored one", /1 without a CVSS/.test($("[data-chart-note]").textContent), $("[data-chart-note]").textContent);
@@ -76,16 +79,40 @@ from.value="2026-06-01"; from.dispatchEvent(new w.Event("change"));
 to.value="2026-08-10";   to.dispatchEvent(new w.Event("change"));
 await new Promise(r=>setTimeout(r,50));
 ok("date filter narrows the list", shown()===4, shown()+" visible");
-ok("chart follows the filter", dots()===3, dots()+" dots");
+ok("chart redraws when the range changes", dots()===3, dots()+" dots");
 ok("summary reflects the subset", /4 of 9/.test($("[data-filter-summary]").textContent), $("[data-filter-summary]").textContent);
 
-// slider mirrors the inputs
-ok("slider handles moved with the dates", $("[data-range-from]").value !== "0", $("[data-range-from]").value);
+// the slider is two handles on one track, not native inputs
+ok("no native range inputs remain", w.document.querySelectorAll('input[type="range"]').length===0);
+ok("two handles on one track", w.document.querySelectorAll(".range-handle").length===2 &&
+   w.document.querySelectorAll("[data-range-track]").length===1);
+ok("handles expose their date to assistive tech",
+   $('[data-range-handle="from"]').getAttribute("aria-valuenow")==="2026-06-01",
+   $('[data-range-handle="from"]').getAttribute("aria-valuenow"));
+ok("handles move with the range", $('[data-range-handle="from"]').style.left !== "",
+   $('[data-range-handle="from"]').style.left);
+ok("fill spans between the handles", $("[data-range-fill]").style.width !== "");
+
+// keyboard: each handle is operable without a pointer
+{
+  const h = $('[data-range-handle="from"]');
+  const before = $("[data-filter-from]").value;
+  h.dispatchEvent(new w.KeyboardEvent("keydown", { key:"ArrowRight", bubbles:true, cancelable:true }));
+  ok("arrow key nudges the start date", $("[data-filter-from]").value !== before,
+     before+" → "+$("[data-filter-from]").value);
+  h.dispatchEvent(new w.KeyboardEvent("keydown", { key:"Home", bubbles:true, cancelable:true }));
+  ok("Home jumps to the domain start", $("[data-filter-from]").value === $("[data-range-min]").textContent,
+     $("[data-filter-from]").value);
+  // put it back for the checks that follow
+  from.value="2026-06-01"; from.dispatchEvent(new w.Event("change"));
+}
 
 // Dates outside the data clamp to its bounds, so an empty range is only
 // reachable in a gap between reports (04-02 … 05-19 here).
-from.value="2026-01-01"; from.dispatchEvent(new w.Event("change"));
-ok("out-of-range start clamps to the earliest report", from.value==="2026-03-14", from.value);
+// The domain now starts at the default window's start, not at the earliest
+// report, so "out of range" means before Jan 1.
+from.value="2025-05-05"; from.dispatchEvent(new w.Event("change"));
+ok("a date before the domain clamps to its start", from.value==="2026-01-01", from.value);
 from.value="2026-04-03"; from.dispatchEvent(new w.Event("change"));
 to.value="2026-05-18";   to.dispatchEvent(new w.Event("change"));
 await new Promise(r=>setTimeout(r,50));
@@ -95,6 +122,8 @@ ok("chart hidden when nothing is scored", $("[data-severity-chart]").hidden);
 
 // reset
 $("[data-filter-reset]").click(); await new Promise(r=>setTimeout(r,50));
+$("[data-filter-reset]").click();
+ok("reset returns to Jan 1 → today", $("[data-filter-from]").value==="2026-01-01", $("[data-filter-from]").value);
 ok("reset restores everything", shown()===9 && dots()===8, shown()+"/"+dots());
 ok("tooltip fires on keyboard focus", (()=>{ const p=w.document.querySelector(".chart-point"); p.dispatchEvent(new w.Event("focus")); return !$("[data-chart-tip]").hidden; })());
 ok("tooltip leads with the value", /^CVSS /.test($(".chart-tip-value").textContent), $(".chart-tip-value").textContent);
@@ -108,6 +137,18 @@ ok("tooltip leads with the value", /^CVSS /.test($(".chart-tip-value").textConte
   ok("no mark escapes the plot area",
      dots.every((d) => d.x >= 34 && d.x <= 944 && d.y >= 14 && d.y <= 192));
   ok("aspect ratio is not stretched", svg.getAttribute("preserveAspectRatio") === null);
+  const css = fs.readFileSync(path.join(HERE, "..", "assets", "main.css"), "utf8");
+  // `height: auto` alone collapses a viewBox-only SVG to zero height in a real
+  // browser — the chart renders but is invisible, and no jsdom test can see it.
+  ok("svg height is pinned by aspect-ratio", /\.severity-chart svg\s*\{[^}]*aspect-ratio/.test(css));
+  // `.report-card { display: block }` outranks the UA's `[hidden]` rule, so
+  // filtered-out cards stay on screen without this. Invisible to jsdom, which
+  // reads the property and not the cascade.
+  ok("hidden cards are actually hidden by the cascade",
+     /\.report-card\[hidden\]/.test(css) && /\.severity-chart\[hidden\]/.test(css));
+  // Two renderers, one behaviour: the page is inert without the script, and
+  // serve.py has its own copy of the template.
+  ok("the page loads patchbook.js", /assets\/patchbook\.js/.test(html), "no script tag in the served HTML");
   ok("grid is a hairline set, not per-point", svg.querySelectorAll(".chart-grid").length === 5);
 }
 

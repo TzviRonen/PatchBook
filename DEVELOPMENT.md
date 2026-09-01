@@ -64,7 +64,7 @@ Votes are **not** frontmatter — they live in the database behind `worker/`. Se
 
 ## Tests
 
-Four suites. The first two need nothing installed and no network:
+Five suites. The first two need nothing installed and no network:
 
 ```bash
 node worker/test.mjs         # 23 — auth, one-vote-per-user, input validation,
@@ -78,11 +78,25 @@ npm install jsdom            #      offline recovery. Rewrites the page's
 node test/ui.test.mjs        #      data-api to its own stub, so it does not
                              #      care what votes_api is set to.
 
-node test/reports.test.mjs   # 23 — date filter, range slider, severity plot.
+node test/reports.test.mjs   # 34 — date filter, range slider, severity plot.
                              #      Writes fixture reports into _reports/ for
                              #      the run and removes them on exit, so the
                              #      filter is exercised with real spread.
+
+npx playwright install --with-deps chromium
+npm install playwright       # 13 — layout and pointer behaviour in a real
+node test/browser.test.mjs   #      browser. Optional, but see below.
 ```
+
+**Run the browser suite before shipping anything visual.** jsdom does no layout
+and no cascade, and shipped three bugs it structurally could not see: an SVG
+that collapsed to zero height (`height: auto` on a viewBox-only element), cards
+that stayed on screen after being filtered out (a class `display` rule outranks
+the user agent's `[hidden]`), and a template that never loaded its own script.
+Every other suite was green through all three.
+
+Note `serve.py` reads `assets/main.css` **once at import** — restart it after a
+stylesheet change or you will be testing the old CSS.
 
 `test_oauth.mjs` exists because `handleCallback` is otherwise unreachable
 without a human at a consent screen — which is exactly how it stayed broken for
