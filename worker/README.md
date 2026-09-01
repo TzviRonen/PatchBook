@@ -22,7 +22,6 @@ npx wrangler d1 create patchbook              # copy the id into wrangler.toml
 #      Getting this wrong makes every request 500 with Cloudflare error 1101.
 #      The id goes in TWO places: [[d1_databases]] and [[env.dev.d1_databases]].
 npx wrangler d1 execute patchbook --remote --file=schema.sql
-npx wrangler d1 execute patchbook --remote --file=seed.sql   # optional: old frontmatter marks
 
 # 2. GitHub OAuth app  (github.com/settings/developers → New OAuth App)
 #    Homepage URL:               https://tzvironen.github.io/PatchBook
@@ -49,22 +48,6 @@ Then set `votes_api` in `../_config.yml` to the deployed Worker URL
 | `GET` | `/api/me` | optional | who the current token belongs to |
 | `GET` | `/auth/login?return=<url>` | — | start GitHub OAuth |
 | `GET` | `/auth/callback` | — | finish OAuth, redirect back with token in the URL fragment |
-
-## Migrations
-
-`schema.sql` uses `CREATE TABLE IF NOT EXISTS`, so it will not alter a table
-that already exists. Schema changes ship as numbered files in `migrations/`,
-applied by hand:
-
-```bash
-npx wrangler d1 execute patchbook --local --env dev --file=migrations/0001-post-id-to-report-id.sql
-npx wrangler d1 execute patchbook --remote           --file=migrations/0001-post-id-to-report-id.sql
-```
-
-`0001` renames `post_id` to `report_id` and rewrites existing `_posts/…` keys to
-`_reports/…`. **A database created before that rename will fail every query with
-"no such column: report_id" until it is applied** — re-running `schema.sql` is
-not enough.
 
 ## Design notes
 

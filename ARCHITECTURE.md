@@ -19,8 +19,8 @@ different backends:
 
 Votes are read/write-hot state that has to be correct per-account, which git
 can't express. Report content is versioned prose with a review gate, which is
-exactly what git is for. Mixing them — the earlier design recorded votes as
-`validations:` frontmatter via a bot commit — meant a ~2 minute delay per vote
+exactly what git is for. Storing votes in frontmatter instead would mean a
+commit and a site rebuild per vote — a minutes-long delay before a count moves,
 and no way to stop one person voting twice.
 
 ```
@@ -61,17 +61,16 @@ endpoint table.
   token, returned in the URL *fragment* and held in `localStorage` — not a
   cookie, because the Worker is a different origin from `github.io` and browsers
   block third-party cookies.
-- **Votes are not in git.** That's the deliberate trade against the old design:
-  the repo is no longer the single source of truth, in exchange for votes that
-  actually work. The database is the record; back it up with
-  `wrangler d1 export`.
+- **Votes are not in git.** The deliberate trade: the repo is not the single
+  source of truth, in exchange for votes that are instant and countable. The
+  database is the record; back it up with `wrangler d1 export`.
 - **Degrading is quiet.** If the Worker is unreachable the report still renders
   normally; only the counts fail, with a status message. A click retries once
   before giving up, so one flaky request can't lock a reader out of voting.
 
 ## Edit suggestions
 
-Unchanged, and entirely GitHub's:
+Entirely GitHub's:
 
 1. "Edit on GitHub" opens the web editor at the report's source file. For readers
    without write access GitHub forks the repo and opens a pull request on save.
@@ -162,7 +161,7 @@ Everything else is covered by `worker/test.mjs` (the API) and `test/ui.test.mjs`
 
 ## ⚠️ Gotcha: bot pushes don't trigger workflows
 
-Kept here because it will bite again if any automation is ever added back:
+Worth knowing before adding any automation that commits to this repo.
 GitHub suppresses workflow runs for events created with the default
 `GITHUB_TOKEN` (recursion prevention), so a bot's `git push` does *not* fire
 `pages.yml`'s `on: push`. The documented escape hatches are `workflow_dispatch`

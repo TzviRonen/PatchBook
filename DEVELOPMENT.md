@@ -138,10 +138,6 @@ depending purely on which URL you typed.
 including the exact `redirect_uri` it sent. Almost always the OAuth app's
 registered callback URL.
 
-**`no such column: report_id`.** The database predates the `post_id` → `report_id`
-rename and `schema.sql` cannot alter an existing table. Apply
-`worker/migrations/0001-post-id-to-report-id.sql`.
-
 **`no such table: votes` locally.** The local D1 is keyed by `database_id`, so
 editing `wrangler.toml` orphans it. `npm run db:local` recreates it; it is
 idempotent and `start_dev.sh` runs it on every start.
