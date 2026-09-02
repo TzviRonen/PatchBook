@@ -61,9 +61,12 @@ const dot = await page.locator(".chart-dot").first().boundingBox();
 ok("dots are round, not stretched", dot && Math.abs(dot.width - dot.height) < 1,
    dot && `${dot.width}x${dot.height}`);
 
-ok("default range is Jan 1 → today",
-   (await page.locator("[data-filter-from]").inputValue()) === "2026-01-01" &&
-   (await page.locator("[data-filter-to]").inputValue()) === new Date().toISOString().slice(0, 10));
+// Opens on Jan 1, or on the earliest report when everything is newer — the
+// default is a starting selection, not a floor.
+ok("default range opens at the earliest report, ending today",
+   (await page.locator("[data-filter-from]").inputValue()) === "2026-03-14" &&
+   (await page.locator("[data-filter-to]").inputValue()) === new Date().toISOString().slice(0, 10),
+   await page.locator("[data-filter-from]").inputValue());
 
 const before = { cards: await page.locator(".report-card:visible").count(),
                  dots: await page.locator(".chart-point").count() };
@@ -98,7 +101,7 @@ ok("arrow keys move a focused handle",
 await page.locator("[data-filter-reset]").click();
 await page.waitForTimeout(200);
 ok("reset returns to the default range",
-   (await page.locator("[data-filter-from]").inputValue()) === "2026-01-01");
+   (await page.locator("[data-filter-from]").inputValue()) === "2026-03-14");
 ok("reset restores the full list",
    (await page.locator(".report-card:visible").count()) === before.cards);
 

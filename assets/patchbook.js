@@ -541,9 +541,10 @@ window.PatchBookReports = (function () {
 
   /* ── filtering ──────────────────────────────────────────────────────── */
 
-  // The range opens on the current year rather than on the data's own extent:
-  // "everything published this year, up to today" is the question a reader
-  // actually arrives with.
+  // The range opens on the current year — "everything published this year, up
+  // to today" is the question a reader arrives with. It is only a starting
+  // selection, not a floor: if every report is newer than this, the range opens
+  // at the earliest one instead.
   var DEFAULT_START = Date.UTC(2026, 0, 1);
 
   function todayUTC() {
@@ -573,9 +574,10 @@ window.PatchBookReports = (function () {
     var endMax = filter.querySelector("[data-range-max]");
 
     var days = rows.map(function (r) { return r.day; });
-    // The domain has to cover both the default window and anything published
-    // outside it, or a report would exist that the slider cannot reach.
-    var minDay = Math.min.apply(null, days.concat([DEFAULT_START]));
+    // The track spans exactly the published data: every position on it means
+    // something, and there is no dead stretch of months with nothing in them.
+    // It widens on its own as older reports arrive.
+    var minDay = Math.min.apply(null, days);
     var maxDay = Math.max.apply(null, days.concat([todayUTC()]));
 
     var from = Math.max(DEFAULT_START, minDay);

@@ -59,9 +59,14 @@ const shown=()=>cards().filter(c=>!c.hidden).length;
 const dots=()=>w.document.querySelectorAll(".chart-point").length;
 
 ok("all 9 reports listed initially", cards().length===9, cards().length);
-ok("default range is Jan 1 → today", $("[data-filter-from]").value==="2026-01-01" &&
+// The range opens on Jan 1, or on the earliest report when every report is
+// newer than that — the default is a starting selection, not a floor.
+ok("default range opens at the earliest report, ending today",
+   $("[data-filter-from]").value==="2026-03-14" &&
    $("[data-filter-to]").value===new Date().toISOString().slice(0,10),
    $("[data-filter-from]").value+" → "+$("[data-filter-to]").value);
+ok("the track starts at the earliest report, not an empty stretch",
+   $("[data-range-min]").textContent==="2026-03-14", $("[data-range-min]").textContent);
 ok("every fixture falls inside the default range", shown()===9, shown());
 ok("chart is visible", !$("[data-severity-chart]").hidden);
 ok("8 dots — the unscored report is not plotted", dots()===8, dots());
@@ -109,10 +114,10 @@ ok("fill spans between the handles", $("[data-range-fill]").style.width !== "");
 
 // Dates outside the data clamp to its bounds, so an empty range is only
 // reachable in a gap between reports (04-02 … 05-19 here).
-// The domain now starts at the default window's start, not at the earliest
-// report, so "out of range" means before Jan 1.
+// The domain starts at the earliest report, so anything before that clamps to
+// it — there is nothing older to find.
 from.value="2025-05-05"; from.dispatchEvent(new w.Event("change"));
-ok("a date before the domain clamps to its start", from.value==="2026-01-01", from.value);
+ok("a date before the earliest report clamps to it", from.value==="2026-03-14", from.value);
 from.value="2026-04-03"; from.dispatchEvent(new w.Event("change"));
 to.value="2026-05-18";   to.dispatchEvent(new w.Event("change"));
 await new Promise(r=>setTimeout(r,50));
@@ -123,7 +128,7 @@ ok("chart hidden when nothing is scored", $("[data-severity-chart]").hidden);
 // reset
 $("[data-filter-reset]").click(); await new Promise(r=>setTimeout(r,50));
 $("[data-filter-reset]").click();
-ok("reset returns to Jan 1 → today", $("[data-filter-from]").value==="2026-01-01", $("[data-filter-from]").value);
+ok("reset returns to the full range", $("[data-filter-from]").value==="2026-03-14", $("[data-filter-from]").value);
 ok("reset restores everything", shown()===9 && dots()===8, shown()+"/"+dots());
 ok("tooltip fires on keyboard focus", (()=>{ const p=w.document.querySelector(".chart-point"); p.dispatchEvent(new w.Event("focus")); return !$("[data-chart-tip]").hidden; })());
 ok("tooltip leads with the value", /^CVSS /.test($(".chart-tip-value").textContent), $(".chart-tip-value").textContent);
