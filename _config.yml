@@ -1,11 +1,11 @@
 title: PatchBook
 description: Windows kernel CVE analysis — binary diffs and patch breakdowns
-url: "https://tzvironen.github.io"
-# Must match the repository name exactly — GitHub Pages serves a project site
-# at /<repo-name> and that path is case-sensitive. The repo is "PatchBook", so
-# a lowercase baseurl makes every relative_url asset (main.css, patchbook.js)
-# 404 on the live site while local preview looks fine.
-baseurl: "/PatchBook"
+url: "https://cvepatchbook.com"
+# Served from the apex custom domain cvepatchbook.com, i.e. at the site root — so
+# baseurl must be empty. (It was "/PatchBook" when the site lived at the GitHub
+# project URL tzvironen.github.io/PatchBook; leaving it set makes every
+# relative_url asset resolve to /PatchBook/assets/... and 404 on the domain.)
+baseurl: ""
 author: tzvironen
 
 # Source repo backing the site — used to build edit-suggestion links (GitHub

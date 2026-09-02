@@ -9,7 +9,7 @@ compatibility_date = "2025-01-01"
 # safeReturnUrl in src/index.js). Production must contain only origins we
 # control, and must never contain a wildcard. worker/test.mjs enforces both.
 [vars]
-ALLOWED_ORIGINS = "https://tzvironen.github.io"
+ALLOWED_ORIGINS = "https://cvepatchbook.com"
 
 # `binding` is the name the code sees as `env.DB` — it is NOT the database name.
 # `wrangler d1 create` suggests naming it after the database; don't, or
@@ -27,7 +27,7 @@ database_id = "14dfdab5-b75e-470f-8379-ef39160fbac7"
 # localhost and 127.0.0.1 are *different* origins to the browser, and the
 # preview servers advertise both. Listing only one means the counts fetch is
 # blocked by CORS and login 400s, depending purely on which URL you typed.
-ALLOWED_ORIGINS = "https://tzvironen.github.io,http://127.0.0.1:3004,http://localhost:3004,http://127.0.0.1:4000,http://localhost:4000"
+ALLOWED_ORIGINS = "https://cvepatchbook.com,http://127.0.0.1:3004,http://localhost:3004,http://127.0.0.1:4000,http://localhost:4000"
 
 [[env.dev.d1_databases]]
 binding = "DB"
