@@ -136,7 +136,7 @@ HOME_TPL = BASE.replace("{% block title %}Reports{% endblock %}", "Reports").rep
     "{% block body %}{% endblock %}", """
 <div class="page">
   <div class="page-header">
-    <h1>CVE Analysis Reports</h1>
+    <h1>N-Day Technical Reports</h1>
     <p>Deep-dives into Windows kernel patches — vulnerability reports with decompilations</p>
   </div>
   <div class="category-grid">
@@ -146,7 +146,7 @@ HOME_TPL = BASE.replace("{% block title %}Reports{% endblock %}", "Reports").rep
         <span class="win-pane"></span><span class="win-pane"></span>
       </span>
       <span class="category-body">
-        <span class="category-name">Windows</span>
+        <span class="category-name">Windows Kernel</span>
         <span class="category-count">{{ reports|length }} report{% if reports|length != 1 %}s{% endif %}</span>
       </span>
     </a>
