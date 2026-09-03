@@ -481,11 +481,19 @@ window.PatchBookReports = (function () {
     var CHART_MARGIN = Math.max(3 * DAY, Math.round(span * 0.07));
     from -= CHART_MARGIN; to += CHART_MARGIN; span = to - from;
 
+    // Severity axis starts 2 points below the lowest-scored report (not 0), so the
+    // cluster of high-severity dots fills the plot instead of hugging the top.
+    var minScore = Math.min.apply(null, scored.map(function (r) { return r.cvss; }));
+    var yMin = Math.max(0, minScore - 2);
+    var yMax = 10;
     var xOf = function (day) { return x0 + ((day - from) / span) * (x1 - x0); };
-    var yOf = function (cvss) { return y1 - (cvss / 10) * (y1 - y0); };
+    var yOf = function (cvss) { return y1 - ((cvss - yMin) / (yMax - yMin)) * (y1 - y0); };
 
-    // recessive hairline grid + severity ticks
-    [0, 2.5, 5, 7.5, 10].forEach(function (v) {
+    // recessive hairline grid + severity ticks: integer marks from the axis floor up to 10
+    var ticks = [];
+    for (var tv = Math.ceil(yMin); tv <= yMax; tv++) ticks.push(tv);
+    if (ticks[0] > yMin) ticks.unshift(Math.round(yMin * 10) / 10);  // label the actual floor
+    ticks.forEach(function (v) {
       var y = yOf(v);
       svg.appendChild(el("line", { x1: x0, y1: y, x2: x1, y2: y, class: "chart-grid" }));
       var label = el("text", { x: x0 - 8, y: y + 4, "text-anchor": "end", class: "chart-axis-text" });
