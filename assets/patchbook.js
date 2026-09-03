@@ -475,9 +475,10 @@ window.PatchBookReports = (function () {
     // and put every dot on the left edge; pad it so they centre instead.
     var span = to - from;
     if (span <= 0) { from -= DAY; to += DAY; span = to - from; }
-    // Extend the time domain a few days on each side so the earliest/latest
-    // reports don't sit flush against the axis — gives the extreme dots margins.
-    var CHART_MARGIN = 3 * DAY;
+    // Extend the time domain on each side so the earliest/latest reports don't sit
+    // flush against the axis. Proportional to the span (min 3 days) so the margin
+    // stays visible whether the range is a week or several months.
+    var CHART_MARGIN = Math.max(3 * DAY, Math.round(span * 0.07));
     from -= CHART_MARGIN; to += CHART_MARGIN; span = to - from;
 
     var xOf = function (day) { return x0 + ((day - from) / span) * (x1 - x0); };
