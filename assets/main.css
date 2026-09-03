@@ -102,6 +102,11 @@ nav {
 }
 .nav-links a:hover { color: var(--text); }
 .nav-links a.active { color: var(--text); border-bottom-color: var(--blue); }
+.nav-github {
+  display: flex; align-items: center; justify-content: center;
+  margin-left: 1rem; color: var(--muted); transition: color 0.15s ease;
+}
+.nav-github:hover { color: var(--text); }
 
 /* ── badges ── */
 .badge {
