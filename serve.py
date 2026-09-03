@@ -136,7 +136,7 @@ HOME_TPL = BASE.replace("{% block title %}Reports{% endblock %}", "Reports").rep
     "{% block body %}{% endblock %}", """
 <div class="page">
   <div class="page-header">
-    <h1>N-Day Technical Reports</h1>
+    <h1>1-Day Technical Patch Reports</h1>
     <p>Deep-dives into Windows kernel patches — vulnerability reports with decompilations</p>
   </div>
   <div class="category-grid">
