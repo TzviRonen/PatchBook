@@ -1,5 +1,5 @@
 ---
 layout: reports
-title: Windows
+title: Windows Kernel
 permalink: /windows/
 ---
