@@ -134,6 +134,9 @@ BASE = """<!DOCTYPE html>
   </a>
 </nav>
 {% block body %}{% endblock %}
+<!-- Cloudflare Web Analytics -->
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "ebb355f88bd542759dc1459c3ef832ff"}'></script>
+<!-- End Cloudflare Web Analytics -->
 </body>
 </html>"""
 
