@@ -30,6 +30,7 @@ kramdown:
 plugins:
   - jekyll-feed
   - jekyll-seo-tag
+  - jekyll-sitemap
 
 # Reports are a custom collection rather than Jekyll's built-in `posts`, so the
 # directory and the URLs both read "report". Two consequences of leaving
@@ -56,6 +57,10 @@ exclude:
   - Gemfile
   - Gemfile.lock
   - README.md
+  - ARCHITECTURE.md
+  - DEVELOPMENT.md
+  - serve.py
+  - docs
   - scripts
   - setup.sh
   - serve.sh

@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /feed-unused.xml
+
+Sitemap: https://cvepatchbook.com/sitemap.xml

@@ -21,7 +21,7 @@ if command -v jekyll >/dev/null 2>&1; then
   echo "[=] Jekyll already installed: $(jekyll --version)"
 else
   echo "[*] Installing Jekyll gems..."
-  sudo gem install --no-document jekyll bundler jekyll-feed jekyll-seo-tag webrick
+  sudo gem install --no-document jekyll bundler jekyll-feed jekyll-seo-tag jekyll-sitemap webrick
 fi
 
 echo

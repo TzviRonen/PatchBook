@@ -22,14 +22,18 @@
   </a>
   <div class="nav-links">
     {%- comment -%}
-      Match on a prefix, not equality: a page's url is `/about.html`, not
-      `/about/`, so the old equality test never fired and no tab was ever
-      highlighted. `/windows/` and a report page both belong under Reports.
+      Match on a prefix, not equality: `/windows/` and a report page both belong
+      under Reports.
+
+      Link the trailing-slash form of every href. These are the canonical URLs
+      ({% seo %} derives the canonical from page.url), so linking `/about` or
+      `/publish` would point every page on the site at a URL that 301s — which
+      is what put these pages in Search Console's "Page with redirect" bucket.
     {%- endcomment -%}
     {%- assign u = page.url -%}
     <a href="{{ '/' | relative_url }}"{% if u == '/' or u contains '/windows' or u contains '/reports/' %} class="active"{% endif %}>Reports</a>
-    <a href="{{ '/publish' | relative_url }}"{% if u contains '/publish' %} class="active"{% endif %}>Publish</a>
-    <a href="{{ '/about' | relative_url }}"{% if u contains '/about' %} class="active"{% endif %}>About</a>
+    <a href="{{ '/publish/' | relative_url }}"{% if u contains '/publish' %} class="active"{% endif %}>Publish</a>
+    <a href="{{ '/about/' | relative_url }}"{% if u contains '/about' %} class="active"{% endif %}>About</a>
   </div>
   <a class="nav-github" href="https://github.com/TzviRonen/PatchBook" target="_blank"
      rel="noopener" aria-label="GitHub repository" title="View source on GitHub">
